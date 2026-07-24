@@ -51,6 +51,48 @@ function periodLabel(){
   const label=new Date(`${dashboardYear}-${dashboardMonth}-01T12:00:00`).toLocaleString("es",{month:"long"});
   return `${label.charAt(0).toUpperCase()+label.slice(1)} ${dashboardYear}`;
 }
+function isCarryForwardTransaction(x){
+  if(x.type!=="ajuste")return false;
+  const text=`${x.category||""} ${x.description||""}`;
+  return /(mes anterior|saldo inicial|nuevo mes|saldo trasladado)/i.test(text);
+}
+function shiftedMonth(year,month,delta=0){
+  const date=new Date(Date.UTC(Number(year),Number(month)-1+delta,1));
+  const label=date.toLocaleString("es",{month:"long",timeZone:"UTC"});
+  return {
+    year:String(date.getUTCFullYear()),
+    month:String(date.getUTCMonth()+1).padStart(2,"0"),
+    label:`${label.charAt(0).toUpperCase()+label.slice(1)} ${date.getUTCFullYear()}`
+  };
+}
+function openingBalanceForMonth(year,month){
+  const ym=`${year}-${month}`;
+  const rows=countryItems(state.transactions)
+    .filter(x=>x.date?.slice(0,7)===ym&&isCarryForwardTransaction(x))
+    .sort((a,b)=>a.date.localeCompare(b.date));
+  return rows.length?Number(rows[0].amount)||0:null;
+}
+function monthlyBalanceReconciliation(t){
+  if(dashboardMonth==="all")return null;
+  const opening=openingBalanceForMonth(dashboardYear,dashboardMonth);
+  const next=shiftedMonth(dashboardYear,dashboardMonth,1);
+  const recordedClosing=openingBalanceForMonth(next.year,next.month);
+  const directFlow=t.income-t.expense;
+  const closing=recordedClosing!==null?recordedClosing:(opening!==null?opening+directFlow:null);
+  const other=opening!==null&&recordedClosing!==null?recordedClosing-opening-directFlow:null;
+  return {opening,closing,other,directFlow,verified:recordedClosing!==null,nextLabel:next.label};
+}
+function signedMoney(value){
+  const number=Number(value)||0;
+  return `${number>0?"+":number<0?"−":""}${money(Math.abs(number))}`;
+}
+function balanceReconciliation(balance,t){
+  const item=(label,value,detail,tone="")=>`<div class="balance-flow-item ${tone}"><span>${label}</span><strong>${value}</strong><small>${detail}</small></div>`;
+  const opening=balance.opening===null?item("Saldo inicial","No disponible","No existe un traslado anterior"):item("Saldo inicial",money(balance.opening),"Trasladado sin contarlo como ingreso");
+  const other=balance.other===null?item("Otros movimientos","Pendiente","Se confirmará al cerrar el mes"):item("Otros movimientos",signedMoney(balance.other),"Transferencias, préstamos y ajustes",balance.other<0?"out":balance.other>0?"in":"");
+  const closing=balance.closing===null?item("Saldo final","No disponible","Falta un saldo de apertura o cierre"):item(balance.verified?"Saldo final":"Saldo final estimado",money(balance.closing),balance.verified?`Confirmado al iniciar ${balance.nextLabel}`:"Saldo inicial + entradas − gastos",balance.closing<0?"out":"in");
+  return `<div class="balance-flow">${opening}${item("Entradas",`+${money(t.income)}`,"Ingresos y cobros","in")}${item("Gastos",`−${money(t.expense)}`,"Consumo clasificado","out")}${other}${closing}</div>`;
+}
 function expenseGroups(tx=dashboardTransactions()){
   const map={};
   tx.filter(x=>x.type==="gasto").forEach(x=>{const k=x.category||"Sin categoría";map[k]=(map[k]||0)+Number(x.amount||0)});
@@ -74,7 +116,7 @@ function totals(tx=countryItems(state.transactions)){
   return {income,expense,balance:income-expense,count:tx.length};
 }
 function renderDashboard(){
-  const years=periodOptions(), tx=dashboardTransactions(), categoryTx=dashboardTransactions({ignoreCategory:true}), timelineTx=dashboardTransactions({ignoreMonth:true}), t=totals(tx), allTime=totals();
+  const years=periodOptions(), tx=dashboardTransactions(), categoryTx=dashboardTransactions({ignoreCategory:true}), timelineTx=dashboardTransactions({ignoreMonth:true}), t=totals(tx), allTime=totals(), balance=monthlyBalanceReconciliation(t);
   const groups=expenseGroups(categoryTx), selectedGroups=expenseGroups(tx), categoryTotal=totals(categoryTx).expense, flexible=selectedGroups.filter(([c])=>isFlexibleCategory(c)).reduce((a,[,v])=>a+v,0);
   const largest=tx.filter(x=>x.type==="gasto").sort((a,b)=>Number(b.amount)-Number(a.amount)).slice(0,5);
   const monthNames=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -83,12 +125,12 @@ function renderDashboard(){
   return `${pageHead("¿En qué se está yendo tu dinero?",`Análisis de ${periodLabel()} en ${meta[state.country].name}.`,filters)}
   ${activeFilters}
   <div class="cards">
-    ${metric("Ingresos del periodo",money(t.income),`${tx.filter(x=>["ingreso","cobro"].includes(x.type)).length} entradas`,"green")}
+    ${metric("Entradas del periodo",money(t.income),`${tx.filter(x=>["ingreso","cobro"].includes(x.type)).length} movimientos de entrada`,"green")}
     ${metric("Gastos del periodo",money(t.expense),`${tx.filter(x=>x.type==="gasto").length} salidas`,"red")}
-    ${metric("Resultado del periodo",money(t.balance),t.balance>=0?"Terminaste por encima de cero":"Gastaste más de lo que entró",t.balance>=0?"green":"red")}
+    ${balance&&balance.closing!==null?metric(balance.verified?"Saldo al cierre":"Saldo final estimado",money(balance.closing),balance.verified?`Confirmado al iniciar ${balance.nextLabel}`:"Saldo inicial + entradas − gastos",balance.closing>=0?"green":"red"):metric("Resultado del periodo",money(t.balance),t.balance>=0?"Terminaste por encima de cero":"Gastaste más de lo que entró",t.balance>=0?"green":"red")}
     ${metric("Gastos ajustables",money(flexible),t.expense?`${Math.round(flexible/t.expense*100)}% de tus gastos`:"Sin gastos en el periodo","yellow")}
   </div>
-  <div class="balance-note"><span>Saldo histórico estimado</span><strong>${money(allTime.balance)}</strong><small>Todos los movimientos de ${meta[state.country].name}; no cambia con el filtro.</small></div>
+  ${balance?balanceReconciliation(balance,t):`<div class="balance-note"><span>Balance acumulado de movimientos clasificados</span><strong>${money(allTime.balance)}</strong><small>Entradas menos gastos de ${meta[state.country].name}; no representa un saldo bancario conciliado.</small></div>`}
   <div class="analysis-grid">
     <div class="panel category-panel"><div class="panel-head"><div><h3>Participación por categoría</h3><small>Qué categorías concentran el gasto</small></div></div>${categoryParticipation(groups,categoryTotal)}</div>
     <div class="panel"><div class="panel-head"><div><h3>${dashboardMonth==="all"?"Gasto por mes":"Gasto por semana"}</h3><small>Valores del periodo seleccionado</small></div></div>${spendingTimeline(timelineTx)}</div>
