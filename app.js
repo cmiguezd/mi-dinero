@@ -9,6 +9,7 @@ let currentPage = "resumen";
 let pendingDelete = null;
 let dashboardYear = "";
 let dashboardMonth = "all";
+let dashboardCategory = "";
 const $ = (s, root=document) => root.querySelector(s);
 const $$ = (s, root=document) => [...root.querySelectorAll(s)];
 const meta = {
@@ -37,10 +38,12 @@ function periodOptions(){
   if(!dashboardYear||!years.includes(dashboardYear))dashboardYear=years[0]||String(new Date().getFullYear());
   return years;
 }
-function dashboardTransactions(){
+function dashboardTransactions({ignoreMonth=false,ignoreCategory=false}={}){
   return countryItems(state.transactions).filter(x=>{
     if(!x.date||x.date.slice(0,4)!==dashboardYear)return false;
-    return dashboardMonth==="all"||x.date.slice(5,7)===dashboardMonth;
+    if(!ignoreMonth&&dashboardMonth!=="all"&&x.date.slice(5,7)!==dashboardMonth)return false;
+    if(!ignoreCategory&&dashboardCategory&&(x.category||"Sin categoría")!==dashboardCategory)return false;
+    return true;
   });
 }
 function periodLabel(){
@@ -71,12 +74,14 @@ function totals(tx=countryItems(state.transactions)){
   return {income,expense,balance:income-expense,count:tx.length};
 }
 function renderDashboard(){
-  const years=periodOptions(), tx=dashboardTransactions(), t=totals(tx), allTime=totals();
-  const groups=expenseGroups(tx), flexible=groups.filter(([c])=>isFlexibleCategory(c)).reduce((a,[,v])=>a+v,0);
+  const years=periodOptions(), tx=dashboardTransactions(), categoryTx=dashboardTransactions({ignoreCategory:true}), timelineTx=dashboardTransactions({ignoreMonth:true}), t=totals(tx), allTime=totals();
+  const groups=expenseGroups(categoryTx), selectedGroups=expenseGroups(tx), categoryTotal=totals(categoryTx).expense, flexible=selectedGroups.filter(([c])=>isFlexibleCategory(c)).reduce((a,[,v])=>a+v,0);
   const largest=tx.filter(x=>x.type==="gasto").sort((a,b)=>Number(b.amount)-Number(a.amount)).slice(0,5);
   const monthNames=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
   const filters=`<div class="period-filters"><label>Año<select class="select" id="dashboardYear">${years.map(y=>`<option ${y===dashboardYear?"selected":""}>${y}</option>`).join("")}</select></label><label>Mes<select class="select" id="dashboardMonth"><option value="all">Todo el año</option>${monthNames.map((m,i)=>`<option value="${String(i+1).padStart(2,"0")}" ${dashboardMonth===String(i+1).padStart(2,"0")?"selected":""}>${m}</option>`).join("")}</select></label></div>`;
+  const activeFilters=dashboardMonth!=="all"||dashboardCategory?`<div class="chart-filter-status" aria-live="polite"><div><span>Vista filtrada</span>${dashboardMonth!=="all"?`<strong>${monthNames[Number(dashboardMonth)-1]} ${dashboardYear}</strong>`:""}${dashboardCategory?`<strong>${escapeHtml(dashboardCategory)}</strong>`:""}</div><button class="button ghost" data-clear-chart-filters>Limpiar filtros</button></div>`:`<div class="chart-filter-hint">Puedes hacer clic en un mes o una categoría para filtrar las demás visuales.</div>`;
   return `${pageHead("¿En qué se está yendo tu dinero?",`Análisis de ${periodLabel()} en ${meta[state.country].name}.`,filters)}
+  ${activeFilters}
   <div class="cards">
     ${metric("Ingresos del periodo",money(t.income),`${tx.filter(x=>["ingreso","cobro"].includes(x.type)).length} entradas`,"green")}
     ${metric("Gastos del periodo",money(t.expense),`${tx.filter(x=>x.type==="gasto").length} salidas`,"red")}
@@ -85,32 +90,45 @@ function renderDashboard(){
   </div>
   <div class="balance-note"><span>Saldo histórico estimado</span><strong>${money(allTime.balance)}</strong><small>Todos los movimientos de ${meta[state.country].name}; no cambia con el filtro.</small></div>
   <div class="analysis-grid">
-    <div class="panel category-panel"><div class="panel-head"><div><h3>Participación por categoría</h3><small>Qué categorías concentran el gasto</small></div></div>${categoryParticipation(groups,t.expense)}</div>
-    <div class="panel"><div class="panel-head"><div><h3>${dashboardMonth==="all"?"Gasto por mes":"Gasto por semana"}</h3><small>Valores del periodo seleccionado</small></div></div>${spendingTimeline(tx)}</div>
+    <div class="panel category-panel"><div class="panel-head"><div><h3>Participación por categoría</h3><small>Qué categorías concentran el gasto</small></div></div>${categoryParticipation(groups,categoryTotal)}</div>
+    <div class="panel"><div class="panel-head"><div><h3>${dashboardMonth==="all"?"Gasto por mes":"Gasto por semana"}</h3><small>Valores del periodo seleccionado</small></div></div>${spendingTimeline(timelineTx)}</div>
   </div>
   <div class="analysis-grid lower">
-    <div class="panel"><div class="panel-head"><div><h3>Gastos con margen de ajuste</h3><small>Restaurantes, compras, ocio y categorías similares</small></div></div>${flexibleBreakdown(groups,t.expense)}</div>
+    <div class="panel"><div class="panel-head"><div><h3>Gastos con margen de ajuste</h3><small>Restaurantes, compras, ocio y categorías similares</small></div></div>${flexibleBreakdown(selectedGroups,t.expense)}</div>
     <div class="panel"><div class="panel-head"><h3>Mayores gastos individuales</h3><button class="button ghost" data-go="transacciones">Ver todos</button></div>${largest.length?transactionRows(largest):empty("Sin gastos","No hay salidas en este periodo.")}</div>
   </div>`;
 }
 function metric(label,value,small,color){return `<article class="metric"><div class="metric-label"><span>${label}</span><i class="dot ${color}"></i></div><div class="metric-value">${value}</div><small>${small}</small></article>`}
+function chartMoney(value){
+  return new Intl.NumberFormat(meta[state.country].locale,{style:"currency",currency:meta[state.country].currency,notation:"compact",compactDisplay:"short",maximumFractionDigits:1}).format(Number(value)||0);
+}
 function categoryParticipation(groups,total){
   if(!groups.length)return empty("Sin gastos","No hay categorías para el periodo seleccionado.");
-  const colors=["var(--accent)","#ff8a65","#8c7ae6","#36c5b4","#e6b94c","#67a8e4","#d36c9d","#8caa5b"];
-  let cursor=0;const stops=groups.slice(0,8).map(([,v],i)=>{const start=cursor;cursor+=v/total*100;return `${colors[i]} ${start}% ${cursor}%`});
-  if(cursor<100)stops.push(`var(--line) ${cursor}% 100%`);
-  return `<div class="category-visual"><div class="donut" style="background:conic-gradient(${stops.join(",")})"><div><strong>${money(total)}</strong><span>Total gastado</span></div></div><div class="category-legend">${groups.slice(0,8).map(([c,v],i)=>`<div><i style="background:${colors[i]}"></i><span title="${escapeAttr(c)}">${escapeHtml(c)}</span><strong>${Math.round(v/total*100)}%</strong><small>${money(v)}</small></div>`).join("")}</div></div>`;
+  const colors=["var(--accent)","#ff8a65","#8c7ae6","#36c5b4","#e6b94c","#67a8e4","#d36c9d","#8caa5b","#ef7aaf","#55b6c2"];
+  let cursor=0;
+  const segments=groups.map(([category,value],i)=>{
+    const percent=total?value/total*100:0,offset=-cursor;cursor+=percent;
+    const label=`${category} · ${Math.round(percent)}% · ${money(value)}`;
+    const selected=dashboardCategory===category,dimmed=dashboardCategory&&!selected;
+    return `<circle class="donut-segment ${selected?"is-selected":""} ${dimmed?"is-dimmed":""}" cx="50" cy="50" r="40" pathLength="100" fill="none" stroke="${colors[i%colors.length]}" stroke-width="18" stroke-dasharray="${percent} ${100-percent}" stroke-dashoffset="${offset}" data-category-filter="${escapeAttr(category)}" tabindex="0" role="button" aria-label="${escapeAttr(label)}"><title>${escapeHtml(label)}</title></circle>`;
+  }).join("");
+  const legend=groups.map(([category,value],i)=>{
+    const percent=total?Math.round(value/total*100):0,selected=dashboardCategory===category,dimmed=dashboardCategory&&!selected;
+    const label=`${category} · ${percent}% · ${money(value)}`;
+    return `<button type="button" class="${selected?"is-selected":""} ${dimmed?"is-dimmed":""}" data-category-filter="${escapeAttr(category)}" title="${escapeAttr(label)}"><i style="background:${colors[i%colors.length]}"></i><span>${escapeHtml(category)}</span><strong>${percent}%</strong><small>${money(value)}</small></button>`;
+  }).join("");
+  return `<div class="category-visual"><div class="donut-wrap"><svg class="donut-svg" viewBox="0 0 100 100" aria-label="Participación del gasto por categoría">${segments}</svg><div class="donut-center"><strong>${money(total)}</strong><span>Total gastado</span></div></div><div class="category-legend">${legend}</div></div>`;
 }
 function spendingTimeline(tx){
   const expenses=tx.filter(x=>x.type==="gasto");
   let buckets=[];
   if(dashboardMonth==="all"){
-    buckets=Array.from({length:12},(_,i)=>({label:new Date(2026,i,1).toLocaleString("es",{month:"short"}),value:expenses.filter(x=>Number(x.date.slice(5,7))===i+1).reduce((a,b)=>a+Number(b.amount),0)}));
+    buckets=Array.from({length:12},(_,i)=>({label:new Date(Number(dashboardYear),i,1).toLocaleString("es",{month:"short"}),value:expenses.filter(x=>Number(x.date.slice(5,7))===i+1).reduce((a,b)=>a+Number(b.amount),0),month:String(i+1).padStart(2,"0")}));
   }else{
-    buckets=Array.from({length:5},(_,i)=>({label:`Sem. ${i+1}`,value:expenses.filter(x=>Math.min(4,Math.floor((Number(x.date.slice(8,10))-1)/7))===i).reduce((a,b)=>a+Number(b.amount),0)}));
+    buckets=Array.from({length:5},(_,i)=>({label:`Sem. ${i+1}`,value:expenses.filter(x=>Math.min(4,Math.floor((Number(x.date.slice(8,10))-1)/7))===i).reduce((a,b)=>a+Number(b.amount),0),month:""}));
   }
   const max=Math.max(1,...buckets.map(x=>x.value));
-  return `<div class="labeled-bars">${buckets.map(x=>`<div class="labeled-bar"><span class="bar-value">${x.value?money(x.value):"—"}</span><div style="height:${Math.max(x.value?7:2,x.value/max*100)}%"></div><small>${x.label}</small></div>`).join("")}</div>`;
+  return `<div class="labeled-bars">${buckets.map(x=>{const height=x.value?Math.max(5,x.value/max*72):2;return `<button type="button" class="labeled-bar ${x.month?"is-clickable":""}" ${x.month?`data-month-filter="${x.month}"`:""} title="${escapeAttr(`${x.label}: ${money(x.value)}`)}"><span class="bar-value">${x.value?chartMoney(x.value):"—"}</span><span class="bar-fill" style="height:${height}%"></span><small>${x.label}</small></button>`}).join("")}</div>`;
 }
 function flexibleBreakdown(groups,total){
   const items=groups.filter(([c])=>isFlexibleCategory(c)).slice(0,7);
@@ -158,7 +176,10 @@ function bindPage(){
   $$("[data-go]").forEach(b=>b.onclick=()=>{currentPage=b.dataset.go;render()});
   $$("[data-pay]").forEach(b=>b.onclick=()=>payLoan(b.dataset.pay));
   const search=$("#searchTx"),filter=$("#typeFilter");if(search)search.oninput=filterTransactions;if(filter)filter.onchange=filterTransactions;
-  const year=$("#dashboardYear"),month=$("#dashboardMonth");if(year)year.onchange=()=>{dashboardYear=year.value;render()};if(month)month.onchange=()=>{dashboardMonth=month.value;render()};
+  const year=$("#dashboardYear"),month=$("#dashboardMonth");if(year)year.onchange=()=>{dashboardYear=year.value;dashboardCategory="";render()};if(month)month.onchange=()=>{dashboardMonth=month.value;render()};
+  $("[data-month-filter]").forEach(b=>b.onclick=()=>{dashboardMonth=dashboardMonth===b.dataset.monthFilter?"all":b.dataset.monthFilter;render()});
+  $("[data-category-filter]").forEach(b=>{b.onclick=()=>{dashboardCategory=dashboardCategory===b.dataset.categoryFilter?"":b.dataset.categoryFilter;render()};b.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();b.click()}}});
+  const clearChartFilters=$("[data-clear-chart-filters]");if(clearChartFilters)clearChartFilters.onclick=()=>{dashboardMonth="all";dashboardCategory="";render()};
   if($("#exportData"))$("#exportData").onclick=exportData;if($("#importData"))$("#importData").onchange=importData;if($("#resetData"))$("#resetData").onclick=()=>askDelete("all","all");
   if($("#connectGoogle"))$("#connectGoogle").onclick=()=>window.MiDineroCloud?.connect();if($("#disconnectGoogle"))$("#disconnectGoogle").onclick=()=>window.MiDineroCloud?.disconnect();if($("#syncNow"))$("#syncNow").onclick=()=>window.MiDineroCloud?.pull();if($("#saveCloudConfig"))$("#saveCloudConfig").onclick=saveCloudConfig;
 }
@@ -193,7 +214,7 @@ function escapeHtml(v=""){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","
 function escapeAttr(v=""){return escapeHtml(v)}
 
 $("#nav").onclick=e=>{const b=e.target.closest("[data-page]");if(!b)return;currentPage=b.dataset.page;$("#sidebar").classList.remove("open");render()};
-$("#countrySwitch").onclick=e=>{const b=e.target.closest("[data-country]");if(!b)return;state.country=b.dataset.country;dashboardYear="";dashboardMonth="all";saveState();render()};
+$("#countrySwitch").onclick=e=>{const b=e.target.closest("[data-country]");if(!b)return;state.country=b.dataset.country;dashboardYear="";dashboardMonth="all";dashboardCategory="";saveState();render()};
 $("#menuButton").onclick=()=>$("#sidebar").classList.toggle("open");
 $("#refreshButton").onclick=()=>{if(window.MiDineroCloud?.isConnected())window.MiDineroCloud.pull();else{state=loadState();render();toast("Datos actualizados")}};
 window.miDineroGetState=()=>structuredClone(state);
