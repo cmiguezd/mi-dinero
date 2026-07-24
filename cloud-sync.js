@@ -24,6 +24,9 @@
     if (/access_denied/i.test(code)) return "Google rechazó el acceso. Entra con carlosmiguez13@gmail.com y acepta los permisos.";
     if (/invalid_client|origin|redirect_uri_mismatch/i.test(`${code} ${description}`)) return "Google no reconoce este Client ID u origen. Revisa que el cliente sea de tipo Aplicación web y autorice https://cmiguezd.github.io";
     if (/idpiframe_initialization_failed|third.party|cookies/i.test(`${code} ${description}`)) return "El navegador bloqueó las cookies necesarias de Google. Permítelas para accounts.google.com y vuelve a intentar.";
+    if (/timeout|tiempo de espera|abort/i.test(`${code} ${description}`)) return "Google Sheets tardó demasiado en responder. Revisa la conexión y vuelve a pulsar Sincronizar.";
+    if (/403|PERMISSION_DENIED|insufficientPermissions/i.test(`${code} ${description}`)) return "Google autorizó la cuenta, pero no permitió modificar este archivo. Verifica que carlosmiguez13@gmail.com sea editor del Sheet y vuelve a conectar.";
+    if (/404|NOT_FOUND|Requested entity was not found/i.test(`${code} ${description}`)) return "No se encontró el Google Sheet configurado. Revisa el ID del archivo en Configuración privada.";
     return `Error de Google: ${description || code || "no identificado"}`;
   }
 
@@ -64,21 +67,34 @@
 
   async function token() { return getToken() || requestToken(""); }
 
+  async function fetchWithTimeout(url, options = {}, timeoutMs = 25000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } catch (error) {
+      if (error?.name === "AbortError") throw new Error("Tiempo de espera agotado al consultar Google Sheets");
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async function api(path, options = {}) {
-    const accessToken = await token();
-    const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${config.spreadsheetId}${path}`, {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${config.spreadsheetId}${path}`;
+    const run = accessToken => fetchWithTimeout(url, {
       ...options,
       headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", ...(options.headers || {}) }
     });
+    let response = await run(await token());
     if (response.status === 401) {
       sessionStorage.removeItem(TOKEN_KEY);
-      const retryToken = await requestToken("");
-      return fetch(`https://sheets.googleapis.com/v4/spreadsheets/${config.spreadsheetId}${path}`, {
-        ...options,
-        headers: { Authorization: `Bearer ${retryToken}`, "Content-Type": "application/json" }
-      });
+      response = await run(await requestToken(""));
     }
-    if (!response.ok) throw new Error(await response.text());
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(`Google Sheets HTTP ${response.status}: ${detail}`);
+    }
     return response.status === 204 ? null : response.json();
   }
 
@@ -109,7 +125,12 @@
       window.miDineroApplyState(remote);
       localStorage.setItem("mi-dinero-last-sync", new Date().toISOString());
       setStatus("Sincronizado con Google Sheets", "ok");
-    } finally { syncing = false; }
+    } catch (error) {
+      console.error("Google Sheets sync:", error);
+      setStatus(friendlyError(error), "error");
+    } finally {
+      syncing = false;
+    }
   }
 
   async function push(nextState = window.miDineroGetState?.()) {
