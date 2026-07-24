@@ -89,7 +89,7 @@
     });
   }
 
-  const range = () => `/${encodeURIComponent(`values/${config.sheetName}!A1:A`)}`;
+  const range = () => `/values/${encodeURIComponent(`${config.sheetName}!A1:A`)}`;
   async function pull() {
     if (syncing) return;
     syncing = true;
@@ -99,6 +99,7 @@
       const result = await api(`${range()}?majorDimension=COLUMNS`);
       const values = result.values?.[0] || [];
       if (!values.length || values[0] !== "MI_DINERO_STATE_V1") {
+        syncing = false;
         await push();
         return;
       }
