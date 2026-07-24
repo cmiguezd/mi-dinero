@@ -40,3 +40,23 @@ body[data-country="CO"] .button{color:#211b00}
 @media(max-width:780px){.period-filters{width:100%}.page-head:has(.period-filters){align-items:stretch;flex-direction:column}.period-filters label{flex:1}.period-filters .select{min-width:0}.balance-note{align-items:flex-start;flex-wrap:wrap}.balance-note small{width:100%;margin-left:0}.category-visual{grid-template-columns:1fr}.category-legend{width:100%}}
 @media(max-width:480px){.category-legend>div{grid-template-columns:9px minmax(70px,1fr) 30px auto}.labeled-bars{overflow-x:auto}.labeled-bar{min-width:32px}}
 @media(max-width:780px){.country-switch button{font-size:inherit;padding:6px}.country-switch .country-name{display:none}.country-flag{width:26px;height:26px;flex-basis:26px}}
+
+
+/* Selector de país compacto v2 */
+.country-switch{padding:3px;gap:2px;border-radius:10px}
+.country-switch button{display:flex;align-items:center;gap:7px;min-height:34px;padding:6px 9px;border-radius:7px}
+.country-switch button.active{background:var(--accent-soft);color:var(--text)}
+.country-flag{width:18px;height:18px;flex:0 0 18px;border-radius:4px;box-shadow:0 0 0 1px rgba(255,255,255,.12)}
+.country-switch button.active .country-flag{box-shadow:0 0 0 1px rgba(255,255,255,.22)}
+.country-name{font-size:12px;line-height:1}
+body[data-country="CN"] .country-switch button.active,
+body[data-country="CO"] .country-switch button.active{background:var(--accent-soft);color:var(--text)}
+@media(max-width:780px){
+  .country-switch button{padding:6px 8px}
+  .country-switch .country-name{display:inline;font-size:11px}
+  .country-flag{width:17px;height:17px;flex-basis:17px}
+}
+@media(max-width:520px){
+  .country-switch .country-name{display:none}
+  .country-switch button{padding:7px}
+}
