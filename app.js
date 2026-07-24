@@ -73,7 +73,7 @@ function totals(tx=countryItems(state.transactions)){
 function renderDashboard(){
   const years=periodOptions(), tx=dashboardTransactions(), t=totals(tx), allTime=totals();
   const groups=expenseGroups(tx), flexible=groups.filter(([c])=>isFlexibleCategory(c)).reduce((a,[,v])=>a+v,0);
-  const recent=tx.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,7);
+  const largest=tx.filter(x=>x.type==="gasto").sort((a,b)=>Number(b.amount)-Number(a.amount)).slice(0,5);
   const monthNames=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
   const filters=`<div class="period-filters"><label>Año<select class="select" id="dashboardYear">${years.map(y=>`<option ${y===dashboardYear?"selected":""}>${y}</option>`).join("")}</select></label><label>Mes<select class="select" id="dashboardMonth"><option value="all">Todo el año</option>${monthNames.map((m,i)=>`<option value="${String(i+1).padStart(2,"0")}" ${dashboardMonth===String(i+1).padStart(2,"0")?"selected":""}>${m}</option>`).join("")}</select></label></div>`;
   return `${pageHead("¿En qué se está yendo tu dinero?",`Análisis de ${periodLabel()} en ${meta[state.country].name}.`,filters)}
@@ -90,7 +90,7 @@ function renderDashboard(){
   </div>
   <div class="analysis-grid lower">
     <div class="panel"><div class="panel-head"><div><h3>Gastos con margen de ajuste</h3><small>Restaurantes, compras, ocio y categorías similares</small></div></div>${flexibleBreakdown(groups,t.expense)}</div>
-    <div class="panel"><div class="panel-head"><h3>Mayores gastos individuales</h3><button class="button ghost" data-go="transacciones">Ver todos</button></div>${recent.filter(x=>x.type==="gasto").length?transactionRows(recent.filter(x=>x.type==="gasto").slice(0,5)):empty("Sin gastos","No hay salidas en este periodo.")}</div>
+    <div class="panel"><div class="panel-head"><h3>Mayores gastos individuales</h3><button class="button ghost" data-go="transacciones">Ver todos</button></div>${largest.length?transactionRows(largest):empty("Sin gastos","No hay salidas en este periodo.")}</div>
   </div>`;
 }
 function metric(label,value,small,color){return `<article class="metric"><div class="metric-label"><span>${label}</span><i class="dot ${color}"></i></div><div class="metric-value">${value}</div><small>${small}</small></article>`}
