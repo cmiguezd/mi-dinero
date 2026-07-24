@@ -142,7 +142,9 @@ function renderDashboard(){
 }
 function metric(label,value,small,color){return `<article class="metric"><div class="metric-label"><span>${label}</span><i class="dot ${color}"></i></div><div class="metric-value">${value}</div><small>${small}</small></article>`}
 function chartMoney(value){
-  return new Intl.NumberFormat(meta[state.country].locale,{style:"currency",currency:meta[state.country].currency,notation:"compact",compactDisplay:"short",maximumFractionDigits:1}).format(Number(value)||0);
+  const decimals=state.country==="CO"?0:2;
+  const formatted=new Intl.NumberFormat("en-US",{minimumFractionDigits:0,maximumFractionDigits:decimals}).format(Number(value)||0);
+  return `${meta[state.country].symbol}${formatted}`;
 }
 function categoryParticipation(groups,total){
   if(!groups.length)return empty("Sin gastos","No hay categorías para el periodo seleccionado.");
@@ -256,7 +258,7 @@ function escapeHtml(v=""){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","
 function escapeAttr(v=""){return escapeHtml(v)}
 
 $("#nav").onclick=e=>{const b=e.target.closest("[data-page]");if(!b)return;currentPage=b.dataset.page;$("#sidebar").classList.remove("open");render()};
-$("#countrySwitch").onclick=e=>{const b=e.target.closest("[data-country]");if(!b)return;state.country=b.dataset.country;dashboardYear="";dashboardMonth="all";dashboardCategory="";saveState();render()};
+$("#countrySwitch").onclick=e=>{const b=e.target.closest("[data-country]");if(!b)return;state.country=b.dataset.country;saveState();render()};
 $("#menuButton").onclick=()=>$("#sidebar").classList.toggle("open");
 $("#refreshButton").onclick=()=>{if(window.MiDineroCloud?.isConnected())window.MiDineroCloud.pull();else{state=loadState();render();toast("Datos actualizados")}};
 window.miDineroGetState=()=>structuredClone(state);
