@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#101117">
+  <title>Mi Dinero</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand"><span class="brand-mark">$</span><span>Mi Dinero</span></div>
+      <nav id="nav">
+        <button class="nav-item active" data-page="resumen"><span>⌂</span>Resumen</button>
+        <button class="nav-item" data-page="transacciones"><span>↕</span>Transacciones</button>
+        <button class="nav-item" data-page="presupuestos"><span>◎</span>Presupuestos</button>
+        <button class="nav-item" data-page="transferencias"><span>⇄</span>Transferencias</button>
+        <button class="nav-item" data-page="prestamos"><span>◇</span>Préstamos</button>
+        <button class="nav-item" data-page="recurrentes"><span>↻</span>Recurrentes</button>
+        <button class="nav-item" data-page="configuracion"><span>⚙</span>Configuración</button>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="avatar">CM</div>
+        <div><strong>Carlos Miguez</strong><small>Administrador</small></div>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <button class="icon-button menu-button" id="menuButton" aria-label="Abrir menú">☰</button>
+        <div>
+          <p class="eyebrow">FINANZAS PERSONALES</p>
+          <h1 id="pageTitle">Resumen</h1>
+        </div>
+        <div class="top-actions">
+          <div class="country-switch" id="countrySwitch">
+            <button data-country="CN" class="active">🇨🇳 China</button>
+            <button data-country="CO">🇨🇴 Colombia</button>
+          </div>
+          <button class="icon-button" id="refreshButton" title="Actualizar">↻</button>
+        </div>
+      </header>
+      <section id="content"></section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop hidden" id="modal">
+    <div class="modal-card">
+      <div class="modal-head"><div><p class="eyebrow" id="modalEyebrow">NUEVO</p><h2 id="modalTitle">Registro</h2></div><button class="icon-button" data-close>×</button></div>
+      <form id="recordForm"></form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="confirmModal">
+    <div class="confirm-card">
+      <div class="danger-icon">!</div>
+      <h2>Eliminar registro</h2>
+      <p id="confirmText">Esta acción no se puede deshacer.</p>
+      <div class="form-actions"><button class="button ghost" data-cancel>Cancelar</button><button class="button danger" id="confirmDelete">Eliminar</button></div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script src="initial-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
