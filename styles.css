@@ -97,3 +97,16 @@ body[data-country="CO"] .icon-button{color:var(--text)}
 body[data-country="CO"] .labeled-bar .bar-value,body[data-country="CO"] .labeled-bar small{color:#f5f5f7}
 @media(max-width:780px){.chart-filter-status{align-items:flex-start}.category-visual{grid-template-columns:1fr}.category-legend{max-height:none}.labeled-bars{overflow-x:auto}.labeled-bar{min-width:42px}}
 @media(max-width:480px){.category-legend>button{grid-template-columns:9px minmax(70px,1fr) 32px auto}}
+
+
+/* Cuadre mensual histórico */
+.balance-flow{margin-top:15px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:14px;background:var(--accent-soft);overflow:hidden}
+.balance-flow-item{min-width:0;padding:14px 16px;border-right:1px solid var(--line);display:grid;gap:5px}
+.balance-flow-item:last-child{border-right:0}
+.balance-flow-item span{color:var(--muted);font-size:11px;font-weight:700}
+.balance-flow-item strong{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.balance-flow-item small{color:var(--muted);font-size:10px;line-height:1.35}
+.balance-flow-item.in strong{color:var(--green)}
+.balance-flow-item.out strong{color:var(--red)}
+@media(max-width:1100px){.balance-flow{grid-template-columns:repeat(3,1fr)}.balance-flow-item:nth-child(3){border-right:0}.balance-flow-item:nth-child(-n+3){border-bottom:1px solid var(--line)}}
+@media(max-width:650px){.balance-flow{grid-template-columns:1fr 1fr}.balance-flow-item,.balance-flow-item:nth-child(3){border-right:1px solid var(--line);border-bottom:1px solid var(--line)}.balance-flow-item:nth-child(even){border-right:0}.balance-flow-item:last-child{grid-column:1/-1;border-right:0;border-bottom:0}}
