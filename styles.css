@@ -136,7 +136,7 @@ body[data-country="CO"] .labeled-bar .bar-value,body[data-country="CO"] .labeled
 }
 
 .balance-flow{
-  grid-template-columns:repeat(6,minmax(0,1fr));
+  grid-template-columns:repeat(5,minmax(0,1fr));
   gap:15px;
   border:0;
   border-left:0;
@@ -145,7 +145,7 @@ body[data-country="CO"] .labeled-bar .bar-value,body[data-country="CO"] .labeled
   overflow:visible;
 }
 .balance-flow-item{
-  grid-column:span 2;
+  grid-column:auto;
   min-height:154px;
   padding:21px 22px;
   align-content:center;
@@ -155,8 +155,8 @@ body[data-country="CO"] .labeled-bar .bar-value,body[data-country="CO"] .labeled
   background:linear-gradient(145deg,color-mix(in srgb,var(--accent) 21%,#181318),color-mix(in srgb,var(--accent) 12%,#111217));
   box-shadow:0 12px 30px rgba(0,0,0,.14);
 }
-.balance-flow-item:nth-last-child(-n+2){
-  grid-column:span 3;
+.balance-flow + .cards{
+  margin-top:15px;
 }
 .balance-flow-item:last-child{
   border-right:1px solid color-mix(in srgb,var(--accent) 35%,var(--line));
