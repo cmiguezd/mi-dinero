@@ -141,9 +141,10 @@
       await ensureSheet();
       const payload = JSON.stringify({ ...nextState, cloud: { updatedAt: new Date().toISOString() } });
       const chunks = payload.match(/.{1,45000}/gs) || [payload];
-      await api(`${range()}?valueInputOption=RAW`, {
+      const writeRange = `${config.sheetName}!A1:A${chunks.length + 2}`;
+      await api(`/values/${encodeURIComponent(writeRange)}?valueInputOption=RAW`, {
         method: "PUT",
-        body: JSON.stringify({ range: `${config.sheetName}!A1:A${chunks.length + 2}`, majorDimension: "COLUMNS", values: [["MI_DINERO_STATE_V1", new Date().toISOString(), ...chunks]] })
+        body: JSON.stringify({ range: writeRange, majorDimension: "COLUMNS", values: [["MI_DINERO_STATE_V1", new Date().toISOString(), ...chunks]] })
       });
       localStorage.setItem("mi-dinero-last-sync", new Date().toISOString());
       setStatus("Cambios guardados", "ok");
