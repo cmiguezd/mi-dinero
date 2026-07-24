@@ -124,13 +124,13 @@ function renderDashboard(){
   const activeFilters=dashboardMonth!=="all"||dashboardCategory?`<div class="chart-filter-status" aria-live="polite"><div><span>Vista filtrada</span>${dashboardMonth!=="all"?`<strong>${monthNames[Number(dashboardMonth)-1]} ${dashboardYear}</strong>`:""}${dashboardCategory?`<strong>${escapeHtml(dashboardCategory)}</strong>`:""}</div><button class="button ghost" data-clear-chart-filters>Limpiar filtros</button></div>`:`<div class="chart-filter-hint">Puedes hacer clic en un mes o una categoría para filtrar las demás visuales.</div>`;
   return `${pageHead("¿En qué se está yendo tu dinero?",`Análisis de ${periodLabel()} en ${meta[state.country].name}.`,filters)}
   ${activeFilters}
+  ${balance?balanceReconciliation(balance,t):`<div class="balance-note"><span>Balance acumulado de movimientos clasificados</span><strong>${money(allTime.balance)}</strong><small>Entradas menos gastos de ${meta[state.country].name}; no representa un saldo bancario conciliado.</small></div>`}
   <div class="cards">
     ${metric("Entradas del periodo",money(t.income),`${tx.filter(x=>["ingreso","cobro"].includes(x.type)).length} movimientos de entrada`,"green")}
     ${metric("Gastos del periodo",money(t.expense),`${tx.filter(x=>x.type==="gasto").length} salidas`,"red")}
     ${balance&&balance.closing!==null?metric(balance.verified?"Saldo al cierre":"Saldo final estimado",money(balance.closing),balance.verified?`Confirmado al iniciar ${balance.nextLabel}`:"Saldo inicial + entradas − gastos",balance.closing>=0?"green":"red"):metric("Resultado del periodo",money(t.balance),t.balance>=0?"Terminaste por encima de cero":"Gastaste más de lo que entró",t.balance>=0?"green":"red")}
     ${metric("Gastos ajustables",money(flexible),t.expense?`${Math.round(flexible/t.expense*100)}% de tus gastos`:"Sin gastos en el periodo","yellow")}
   </div>
-  ${balance?balanceReconciliation(balance,t):`<div class="balance-note"><span>Balance acumulado de movimientos clasificados</span><strong>${money(allTime.balance)}</strong><small>Entradas menos gastos de ${meta[state.country].name}; no representa un saldo bancario conciliado.</small></div>`}
   <div class="analysis-grid">
     <div class="panel category-panel"><div class="panel-head"><div><h3>Participación por categoría</h3><small>Qué categorías concentran el gasto</small></div></div>${categoryParticipation(groups,categoryTotal)}</div>
     <div class="panel"><div class="panel-head"><div><h3>${dashboardMonth==="all"?"Gasto por mes":"Gasto por semana"}</h3><small>Valores del periodo seleccionado</small></div></div>${spendingTimeline(timelineTx)}</div>
