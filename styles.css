@@ -60,3 +60,40 @@ body[data-country="CO"] .country-switch button.active{background:var(--accent-so
   .country-switch .country-name{display:none}
   .country-switch button{padding:7px}
 }
+
+/* Interacciones cruzadas y contraste del dashboard */
+body[data-country="CO"] .button.ghost{background:var(--panel2);border-color:var(--line);color:var(--text)}
+body[data-country="CO"] .button.ghost:hover{border-color:#6d5a13;background:#262313;color:#fff}
+body[data-country="CO"] .icon-button{color:var(--text)}
+.chart-filter-hint{margin:-5px 0 15px;color:var(--muted);font-size:12px}
+.chart-filter-status{margin:-5px 0 15px;padding:10px 12px;border:1px solid color-mix(in srgb,var(--accent) 42%,var(--line));border-radius:12px;background:var(--accent-soft);display:flex;justify-content:space-between;align-items:center;gap:12px}
+.chart-filter-status>div{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px}
+.chart-filter-status>div>span{color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.chart-filter-status strong{padding:5px 8px;border-radius:8px;background:rgba(255,255,255,.07);font-size:11px}
+.chart-filter-status .button{padding:7px 10px;white-space:nowrap}
+.category-visual{grid-template-columns:210px minmax(0,1fr)}
+.donut-wrap{width:190px;aspect-ratio:1;position:relative;margin:auto}
+.donut-svg{display:block;width:100%;height:100%;overflow:visible}
+.donut-segment{transform:rotate(-90deg);transform-origin:50px 50px;cursor:pointer;transition:opacity .18s,filter .18s,stroke-width .18s;outline:none}
+.donut-segment:hover,.donut-segment:focus-visible,.donut-segment.is-selected{filter:brightness(1.2) drop-shadow(0 0 3px rgba(255,255,255,.28));stroke-width:21}
+.donut-segment.is-dimmed{opacity:.28}
+.donut-center{position:absolute;inset:28%;z-index:2;border-radius:50%;background:var(--panel);display:grid;place-content:center;text-align:center;pointer-events:none;padding:8px}
+.donut-center strong{font-size:15px}.donut-center span{color:var(--muted);font-size:10px;margin-top:3px}
+.category-legend{max-height:300px;overflow:auto;padding-right:3px}
+.category-legend>button{width:100%;display:grid;grid-template-columns:9px minmax(90px,1fr) 35px auto;gap:8px;align-items:center;border:0;border-radius:8px;background:transparent;color:var(--text);padding:5px 6px;font:inherit;font-size:11px;cursor:pointer;text-align:left;transition:background .18s,opacity .18s}
+.category-legend>button:hover,.category-legend>button:focus-visible,.category-legend>button.is-selected{background:var(--accent-soft);outline:none}
+.category-legend>button.is-dimmed{opacity:.42}
+.category-legend>button i{width:8px;height:8px;border-radius:50%}
+.category-legend>button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.category-legend>button strong{text-align:right}.category-legend>button small{color:#b8bac7;text-align:right;white-space:nowrap}
+.labeled-bars{height:270px;align-items:stretch;gap:6px;padding:12px 0 0}
+.labeled-bar{height:100%;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;border:0;border-radius:9px;background:transparent;color:var(--text);padding:6px 2px 3px;font:inherit;cursor:default;transition:background .18s}
+.labeled-bar.is-clickable{cursor:pointer}
+.labeled-bar.is-clickable:hover,.labeled-bar.is-clickable:focus-visible{background:var(--accent-soft);outline:none}
+.labeled-bar .bar-value{position:static;writing-mode:horizontal-tb;transform:none;display:flex;align-items:flex-end;height:27px;max-height:none;overflow:visible;color:#f2f3f8;font-size:9px;font-weight:700;white-space:nowrap}
+.labeled-bar .bar-fill{display:block;width:min(34px,70%);min-height:3px;background:linear-gradient(180deg,var(--accent),color-mix(in srgb,var(--accent) 62%,#111));border-radius:6px 6px 2px 2px;transition:filter .18s,transform .18s}
+.labeled-bar.is-clickable:hover .bar-fill{filter:brightness(1.12);transform:translateY(-2px)}
+.labeled-bar small{position:static;color:#c4c6d4;font-size:9px;text-transform:capitalize;white-space:nowrap}
+body[data-country="CO"] .labeled-bar .bar-value,body[data-country="CO"] .labeled-bar small{color:#f5f5f7}
+@media(max-width:780px){.chart-filter-status{align-items:flex-start}.category-visual{grid-template-columns:1fr}.category-legend{max-height:none}.labeled-bars{overflow-x:auto}.labeled-bar{min-width:42px}}
+@media(max-width:480px){.category-legend>button{grid-template-columns:9px minmax(70px,1fr) 32px auto}}
