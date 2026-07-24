@@ -16,6 +16,17 @@
     }
   };
 
+  function friendlyError(error) {
+    const code = error?.type || error?.error || error?.message || String(error || "");
+    const description = error?.error_description || "";
+    if (/popup_failed_to_open/i.test(code)) return "El navegador bloqueó la ventana de Google. Habilita las ventanas emergentes y vuelve a intentar.";
+    if (/popup_closed/i.test(code)) return "La ventana de Google se cerró antes de autorizar el acceso.";
+    if (/access_denied/i.test(code)) return "Google rechazó el acceso. Entra con carlosmiguez13@gmail.com y acepta los permisos.";
+    if (/invalid_client|origin|redirect_uri_mismatch/i.test(`${code} ${description}`)) return "Google no reconoce este Client ID u origen. Revisa que el cliente sea de tipo Aplicación web y autorice https://cmiguezd.github.io";
+    if (/idpiframe_initialization_failed|third.party|cookies/i.test(`${code} ${description}`)) return "El navegador bloqueó las cookies necesarias de Google. Permítelas para accounts.google.com y vuelve a intentar.";
+    return `Error de Google: ${description || code || "no identificado"}`;
+  }
+
   function loadScript(src) {
     return new Promise((resolve, reject) => {
       if (document.querySelector(`script[src="${src}"]`)) return resolve();
@@ -23,50 +34,41 @@
       script.src = src;
       script.async = true;
       script.onload = resolve;
-      script.onerror = reject;
+      script.onerror = () => reject(new Error("No se pudo cargar el servicio de acceso de Google"));
       document.head.appendChild(script);
     });
   }
 
   async function ensureGoogle() {
     if (!configured()) throw new Error("La conexión con Google aún no está configurada.");
-    if (!window.google?.accounts?.oauth2) {
-      await loadScript("https://accounts.google.com/gsi/client");
-    }
-    if (!tokenClient) {
-      tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: config.clientId,
-        scope: "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email",
-        callback: () => {}
-      });
-    }
+    if (!window.google?.accounts?.oauth2) await loadScript("https://accounts.google.com/gsi/client");
+    if (!window.google?.accounts?.oauth2) throw new Error("Google Identity Services no quedó disponible");
   }
 
   async function requestToken(prompt = "") {
     await ensureGoogle();
     return new Promise((resolve, reject) => {
-      tokenClient.callback = response => {
-        if (response.error) return reject(new Error(response.error));
-        sessionStorage.setItem(TOKEN_KEY, response.access_token);
-        resolve(response.access_token);
-      };
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: config.clientId,
+        scope: "https://www.googleapis.com/auth/spreadsheets",
+        callback: response => {
+          if (response.error) return reject(response);
+          sessionStorage.setItem(TOKEN_KEY, response.access_token);
+          resolve(response.access_token);
+        },
+        error_callback: error => reject(error)
+      });
       tokenClient.requestAccessToken({ prompt });
     });
   }
 
-  async function token() {
-    return getToken() || requestToken("");
-  }
+  async function token() { return getToken() || requestToken(""); }
 
   async function api(path, options = {}) {
     const accessToken = await token();
     const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${config.spreadsheetId}${path}`, {
       ...options,
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-        ...(options.headers || {})
-      }
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", ...(options.headers || {}) }
     });
     if (response.status === 401) {
       sessionStorage.removeItem(TOKEN_KEY);
@@ -103,14 +105,11 @@
         await push();
         return;
       }
-      const payload = values.slice(2).join("");
-      const remote = JSON.parse(payload);
+      const remote = JSON.parse(values.slice(2).join(""));
       window.miDineroApplyState(remote);
       localStorage.setItem("mi-dinero-last-sync", new Date().toISOString());
       setStatus("Sincronizado con Google Sheets", "ok");
-    } finally {
-      syncing = false;
-    }
+    } finally { syncing = false; }
   }
 
   async function push(nextState = window.miDineroGetState?.()) {
@@ -119,10 +118,7 @@
     setStatus("Guardando en Google Sheets…");
     try {
       await ensureSheet();
-      const payload = JSON.stringify({
-        ...nextState,
-        cloud: { updatedAt: new Date().toISOString(), updatedBy: config.allowedEmail }
-      });
+      const payload = JSON.stringify({ ...nextState, cloud: { updatedAt: new Date().toISOString() } });
       const chunks = payload.match(/.{1,45000}/gs) || [payload];
       await api(`${range()}?valueInputOption=RAW`, {
         method: "PUT",
@@ -130,26 +126,24 @@
       });
       localStorage.setItem("mi-dinero-last-sync", new Date().toISOString());
       setStatus("Cambios guardados", "ok");
-    } finally {
-      syncing = false;
-    }
+    } finally { syncing = false; }
   }
 
   function queueSave(nextState) {
     if (!getToken()) return;
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => push(nextState).catch(err => setStatus("Error al guardar", "error")), 900);
+    saveTimer = setTimeout(() => push(nextState).catch(error => setStatus(friendlyError(error), "error")), 900);
   }
 
   async function connect() {
     try {
       setStatus("Conectando con Google…");
-      await requestToken("consent");
+      await requestToken("consent select_account");
       await pull();
       window.miDineroRefresh?.();
     } catch (error) {
-      console.error(error);
-      setStatus(configured() ? "No fue posible conectar" : "Falta configurar Google OAuth", "error");
+      console.error("Google OAuth:", error);
+      setStatus(configured() ? friendlyError(error) : "Falta configurar Google OAuth", "error");
     }
   }
 
