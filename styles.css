@@ -18,6 +18,10 @@ body[data-country="CO"] .avatar{background:#3a3212;color:#ffe680}
 body[data-country="CN"] .country-switch button.active{background:#6a2026;color:#fff}
 body[data-country="CO"] .country-switch button.active{background:#5d4b09;color:#fff4b8}
 body[data-country="CO"] .button{color:#211b00}
+.country-switch button{display:flex;align-items:center;gap:8px}
+.country-flag{width:24px;height:24px;display:block;flex:0 0 24px;border-radius:7px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.14)}
+.country-flag svg{display:block;width:100%;height:100%}
+.country-switch button.active .country-flag{box-shadow:0 0 0 2px rgba(255,255,255,.28)}
 .period-filters{display:flex;gap:10px;align-items:end}
 .period-filters label{display:grid;gap:6px;color:var(--muted);font-size:11px;font-weight:700}
 .period-filters .select{min-width:135px;padding:9px 34px 9px 11px}
@@ -35,3 +39,4 @@ body[data-country="CO"] .button{color:#211b00}
 @media(max-width:1100px){.analysis-grid,.analysis-grid.lower{grid-template-columns:1fr}.category-visual{grid-template-columns:190px 1fr}}
 @media(max-width:780px){.period-filters{width:100%}.page-head:has(.period-filters){align-items:stretch;flex-direction:column}.period-filters label{flex:1}.period-filters .select{min-width:0}.balance-note{align-items:flex-start;flex-wrap:wrap}.balance-note small{width:100%;margin-left:0}.category-visual{grid-template-columns:1fr}.category-legend{width:100%}}
 @media(max-width:480px){.category-legend>div{grid-template-columns:9px minmax(70px,1fr) 30px auto}.labeled-bars{overflow-x:auto}.labeled-bar{min-width:32px}}
+@media(max-width:780px){.country-switch button{font-size:inherit;padding:6px}.country-switch .country-name{display:none}.country-flag{width:26px;height:26px;flex-basis:26px}}
