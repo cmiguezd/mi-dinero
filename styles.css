@@ -25,7 +25,7 @@ body[data-country="CO"] .button{color:#211b00}
 .period-filters{display:flex;gap:10px;align-items:end}
 .period-filters label{display:grid;gap:6px;color:var(--muted);font-size:11px;font-weight:700}
 .period-filters .select{min-width:135px;padding:9px 34px 9px 11px}
-.balance-note{margin-top:15px;padding:14px 18px;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:13px;background:var(--accent-soft);display:flex;gap:12px;align-items:center}
+.balance-note{margin:15px 0;padding:14px 18px;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:13px;background:var(--accent-soft);display:flex;gap:12px;align-items:center}
 .balance-note span{color:var(--muted);font-size:12px}.balance-note strong{font-size:17px}.balance-note small{color:var(--muted);margin-left:auto}
 .analysis-grid{display:grid;grid-template-columns:1.18fr .82fr;gap:15px;margin-top:15px}.analysis-grid.lower{grid-template-columns:1fr 1fr}
 .panel-head small,.panel-head div small{display:block;color:var(--muted);font-size:11px;margin-top:4px}
