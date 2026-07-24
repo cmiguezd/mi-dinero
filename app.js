@@ -60,7 +60,7 @@ function render(){
   document.body.dataset.country=state.country;
   $("#pageTitle").textContent=pageNames[currentPage];
   $$(".nav-item").forEach(x=>x.classList.toggle("active",x.dataset.page===currentPage));
-  $("#countrySwitch button").forEach(x=>x.classList.toggle("active",x.dataset.country===state.country));
+  document.querySelectorAll("#countrySwitch button").forEach(x=>x.classList.toggle("active",x.dataset.country===state.country));
   const views={resumen:renderDashboard,transacciones:renderTransactions,presupuestos:renderBudgets,transferencias:renderTransfers,prestamos:renderLoans,recurrentes:renderRecurrings,configuracion:renderSettings};
   $("#content").innerHTML=views[currentPage]();
   bindPage();
