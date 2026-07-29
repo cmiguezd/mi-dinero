@@ -209,14 +209,14 @@ function categoryParticipation(groups,total){
     const percent=total?value/total*100:0,offset=-cursor;cursor+=percent;
     const label=`${category} · ${Math.round(percent)}% · ${money(value)}`;
     const selected=dashboardCategory===category,dimmed=dashboardCategory&&!selected;
-    return `<circle class="donut-segment ${selected?"is-selected":""} ${dimmed?"is-dimmed":""}" cx="50" cy="50" r="40" pathLength="100" fill="none" stroke="${colors[i%colors.length]}" stroke-width="18" stroke-dasharray="${percent} ${100-percent}" stroke-dashoffset="${offset}" data-category-filter="${escapeAttr(category)}" tabindex="0" role="button" aria-label="${escapeAttr(label)}"><title>${escapeHtml(label)}</title></circle>`;
+    return `<circle class="donut-segment ${selected?"is-selected":""} ${dimmed?"is-dimmed":""}" cx="50" cy="50" r="40" pathLength="100" fill="none" stroke="${colors[i%colors.length]}" stroke-width="18" stroke-dasharray="${percent} ${100-percent}" stroke-dashoffset="${offset}" data-category-filter="${escapeAttr(category)}" data-tooltip-title="${escapeAttr(category)}" data-tooltip-detail="${Math.round(percent)}% · ${escapeAttr(money(value))}" data-tooltip-color="${colors[i%colors.length]}" tabindex="0" role="button" aria-label="${escapeAttr(label)}"></circle>`;
   }).join("");
   const legend=groups.map(([category,value],i)=>{
     const percent=total?Math.round(value/total*100):0,selected=dashboardCategory===category,dimmed=dashboardCategory&&!selected;
     const label=`${category} · ${percent}% · ${money(value)}`;
     return `<button type="button" class="${selected?"is-selected":""} ${dimmed?"is-dimmed":""}" data-category-filter="${escapeAttr(category)}" title="${escapeAttr(label)}"><i style="background:${colors[i%colors.length]}"></i><span>${escapeHtml(category)}</span><strong>${percent}%</strong><small>${money(value)}</small></button>`;
   }).join("");
-  return `<div class="category-visual"><div class="donut-wrap"><svg class="donut-svg" viewBox="0 0 100 100" aria-label="Participación del gasto por categoría">${segments}</svg><div class="donut-center"><strong>${money(total)}</strong><span>Total gastado</span></div></div><div class="category-legend">${legend}</div></div>`;
+  return `<div class="category-visual"><div class="donut-wrap"><svg class="donut-svg" viewBox="0 0 100 100" aria-label="Participación del gasto por categoría">${segments}</svg><div class="donut-center"><strong>${money(total)}</strong><span>Total gastado</span></div><div class="donut-tooltip" role="tooltip" aria-hidden="true"><strong></strong><span></span></div></div><div class="category-legend">${legend}</div></div>`;
 }
 function spendingTimeline(tx){
   const expenses=tx.filter(x=>x.type==="gasto");
@@ -338,7 +338,25 @@ function bindPage(){
   const search=$("#searchTx"),filter=$("#typeFilter");if(search)search.oninput=filterTransactions;if(filter)filter.onchange=filterTransactions;
   const year=$("#globalYear"),month=$("#globalMonth");if(year)year.onchange=()=>{dashboardYear=year.value;dashboardCategory="";savePeriod();render()};if(month)month.onchange=()=>{dashboardMonth=month.value;savePeriod();render()};
   $$("[data-month-filter]").forEach(b=>b.onclick=()=>{dashboardMonth=dashboardMonth===b.dataset.monthFilter?"all":b.dataset.monthFilter;savePeriod();render()});
-  $$("[data-category-filter]").forEach(b=>{b.onclick=()=>{dashboardCategory=dashboardCategory===b.dataset.categoryFilter?"":b.dataset.categoryFilter;render()};b.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();b.click()}}});
+  $("[data-category-filter]").forEach(b=>{b.onclick=()=>{dashboardCategory=dashboardCategory===b.dataset.categoryFilter?"":b.dataset.categoryFilter;render()};b.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();b.click()}}});
+  const donutWrap=$(".donut-wrap"),donutTooltip=$(".donut-tooltip");
+  if(donutWrap&&donutTooltip){
+    const showDonutTooltip=(segment,x,y)=>{
+      donutTooltip.querySelector("strong").textContent=segment.dataset.tooltipTitle;
+      donutTooltip.querySelector("span").textContent=segment.dataset.tooltipDetail;
+      donutTooltip.style.setProperty("--tooltip-color",segment.dataset.tooltipColor);
+      donutTooltip.style.left=`${x}px`;donutTooltip.style.top=`${y}px`;
+      donutTooltip.classList.add("show");donutTooltip.setAttribute("aria-hidden","false");
+    };
+    const hideDonutTooltip=()=>{donutTooltip.classList.remove("show");donutTooltip.setAttribute("aria-hidden","true")};
+    $(".donut-segment",donutWrap).forEach(segment=>{
+      segment.onpointerenter=e=>showDonutTooltip(segment,e.clientX-donutWrap.getBoundingClientRect().left,e.clientY-donutWrap.getBoundingClientRect().top);
+      segment.onpointermove=e=>showDonutTooltip(segment,e.clientX-donutWrap.getBoundingClientRect().left,e.clientY-donutWrap.getBoundingClientRect().top);
+      segment.onpointerleave=hideDonutTooltip;
+      segment.onfocus=()=>{const wrapRect=donutWrap.getBoundingClientRect(),rect=segment.getBoundingClientRect();showDonutTooltip(segment,rect.left+rect.width/2-wrapRect.left,rect.top-wrapRect.top)};
+      segment.onblur=hideDonutTooltip;
+    });
+  }
   const clearChartFilters=$("[data-clear-chart-filters]");if(clearChartFilters)clearChartFilters.onclick=()=>{dashboardCategory="";render()};
   const clearPeriod=$("[data-clear-period]");if(clearPeriod)clearPeriod.onclick=()=>{dashboardYear=periodOptions()[0]||String(new Date().getFullYear());dashboardMonth="all";dashboardCategory="";savePeriod();render()};
   if($("#exportData"))$("#exportData").onclick=exportData;if($("#importData"))$("#importData").onchange=importData;if($("#resetData"))$("#resetData").onclick=()=>askDelete("all","all");
