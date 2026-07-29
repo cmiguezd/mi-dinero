@@ -519,3 +519,40 @@ body[data-country="CO"] .labeled-bar .bar-value,body[data-country="CO"] .labeled
     max-height:260px;
   }
 }
+
+
+/* Tooltip personalizado para la dona */
+.donut-tooltip{
+  --tooltip-color:var(--accent);
+  position:absolute;
+  z-index:8;
+  display:flex;
+  align-items:center;
+  gap:5px;
+  max-width:210px;
+  padding:8px 10px;
+  border:1px solid var(--tooltip-color);
+  border-radius:9px;
+  background:#0f1016;
+  color:var(--text);
+  box-shadow:0 10px 28px rgba(0,0,0,.34);
+  font:700 11px/1.2 "DM Sans",sans-serif;
+  white-space:nowrap;
+  opacity:0;
+  pointer-events:none;
+  transform:translate(-50%,calc(-100% - 12px)) translateY(4px);
+  transition:opacity .16s,transform .16s;
+}
+.donut-tooltip strong{
+  color:#fff;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.donut-tooltip span{
+  color:#e5e6ed;
+  flex:0 0 auto;
+}
+.donut-tooltip.show{
+  opacity:1;
+  transform:translate(-50%,calc(-100% - 12px)) translateY(0);
+}
