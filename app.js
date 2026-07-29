@@ -85,13 +85,22 @@ function openingBalanceForMonth(year,month){
     .sort((a,b)=>a.date.localeCompare(b.date));
   return rows.length?Number(rows[0].amount)||0:null;
 }
+function isLoanTransaction(x){
+  const text=`${x.category||""} ${x.description||""} ${x.originalType||x.tipoOriginal||x.Tipo_original||""}`;
+  return /(pr[eé]stamo|deuda|nos pagan|capital prestado|pago de capital)/i.test(text);
+}
 function monthlyBalanceReconciliation(){
   if(dashboardMonth==="all")return null;
   const opening=openingBalanceForMonth(dashboardYear,dashboardMonth);
   const periodTx=dashboardTransactions({ignoreCategory:true});
-  const periodTotals=totals(periodTx);
+  const operatingTx=periodTx.filter(x=>!isLoanTransaction(x));
+  const periodTotals=totals(operatingTx);
   const directFlow=periodTotals.income-periodTotals.expense;
-  const adjustmentFlow=periodTx.reduce((sum,x)=>sum+(x.type==="ajuste"?transactionCashChange(x):0),0);
+  const loanTx=periodTx.filter(isLoanTransaction);
+  const loanFlow=loanTx.reduce((sum,x)=>sum+transactionCashChange(x),0);
+  const adjustmentFlow=periodTx
+    .filter(x=>x.type==="ajuste"&&!isLoanTransaction(x))
+    .reduce((sum,x)=>sum+transactionCashChange(x),0);
   const ym=`${dashboardYear}-${dashboardMonth}`;
   const transferFlow=state.transfers.reduce((sum,x)=>{
     if(x.from===state.country&&x.date?.startsWith(ym))sum-=(Number(x.sent)||0)+(Number(x.fee)||0);
@@ -102,20 +111,33 @@ function monthlyBalanceReconciliation(){
   const next=shiftedMonth(dashboardYear,dashboardMonth,1);
   const recordedClosing=openingBalanceForMonth(next.year,next.month);
   const calculatedOther=adjustmentFlow+transferFlow;
-  const closing=recordedClosing!==null?recordedClosing:(opening!==null?opening+directFlow+calculatedOther:null);
-  const other=opening!==null&&recordedClosing!==null?recordedClosing-opening-directFlow:calculatedOther;
-  return {opening,closing,other,directFlow,verified:recordedClosing!==null,nextLabel:next.label};
+  const closing=recordedClosing!==null?recordedClosing:(opening!==null?opening+directFlow+loanFlow+calculatedOther:null);
+  const transferAndAdjustments=opening!==null&&recordedClosing!==null
+    ?recordedClosing-opening-directFlow-loanFlow
+    :calculatedOther;
+  return {
+    opening,closing,loanFlow,transferAndAdjustments,
+    income:periodTotals.income,expense:periodTotals.expense,
+    loanCount:loanTx.length,verified:recordedClosing!==null,nextLabel:next.label
+  };
 }
 function signedMoney(value){
   const number=Number(value)||0;
   return `${number>0?"+":number<0?"−":""}${money(Math.abs(number))}`;
 }
-function balanceReconciliation(balance,t){
+function balanceReconciliation(balance){
   const item=(label,value,detail,tone="")=>`<div class="balance-flow-item ${tone}"><span>${label}</span><strong>${value}</strong><small>${detail}</small></div>`;
-  const opening=balance.opening===null?item("Saldo inicial","No disponible","No existe un traslado anterior"):item("Saldo inicial",money(balance.opening),"Trasladado sin contarlo como ingreso");
-  const other=balance.other===null?item("Otros movimientos","Pendiente","Se confirmará al cerrar el mes"):item("Otros movimientos",signedMoney(balance.other),"Transferencias, préstamos y ajustes",balance.other<0?"out":balance.other>0?"in":"");
-  const closing=balance.closing===null?item("Saldo final","No disponible","Falta un saldo de apertura o cierre"):item(balance.verified?"Saldo final":"Saldo final estimado",money(balance.closing),balance.verified?`Confirmado al iniciar ${balance.nextLabel}`:"Saldo inicial + entradas − gastos",balance.closing<0?"out":"in");
-  return `<div class="balance-flow">${opening}${item("Entradas",`+${money(t.income)}`,"Ingresos y cobros","in")}${item("Gastos",`−${money(t.expense)}`,"Consumo clasificado","out")}${other}${closing}</div>`;
+  const opening=balance.opening===null
+    ?item("1. Mes anterior","No disponible","No existe un saldo trasladado")
+    :item("1. Mes anterior",money(balance.opening),"Punto de partida; no cuenta como ingreso");
+  const income=item("2. Ingresos del mes",`+${money(balance.income)}`,"Ingresos reales, sin préstamos","in");
+  const loans=item("3. Préstamos y deudas",signedMoney(balance.loanFlow),balance.loanCount?"Entradas y pagos de capital del mes":"Sin movimientos de deuda",balance.loanFlow<0?"out":balance.loanFlow>0?"in":"");
+  const transfers=item("4. Transferencias y ajustes",signedMoney(balance.transferAndAdjustments),"Movimientos de caja fuera de ingresos y gastos",balance.transferAndAdjustments<0?"out":balance.transferAndAdjustments>0?"in":"");
+  const expenses=item("5. Gastos del mes",`−${money(balance.expense)}`,"Consumo y gastos reales","out");
+  const closing=balance.closing===null
+    ?item("6. Saldo final","No disponible","Falta un saldo de apertura o cierre")
+    :item(balance.verified?"6. Saldo final":"6. Saldo final estimado",money(balance.closing),balance.verified?`Conciliado con ${balance.nextLabel}`:"Resultado de las cinco tarjetas anteriores",balance.closing<0?"out":"in");
+  return `<div class="balance-flow">${opening}${income}${loans}${transfers}${expenses}${closing}</div>`;
 }
 function expenseGroups(tx=dashboardTransactions()){
   const map={};
@@ -148,13 +170,7 @@ function renderDashboard(){
   const activeFilters=dashboardMonth!=="all"||dashboardCategory?`<div class="chart-filter-status" aria-live="polite"><div><span>Vista filtrada</span>${dashboardMonth!=="all"?`<strong>${monthNames[Number(dashboardMonth)-1]} ${dashboardYear}</strong>`:""}${dashboardCategory?`<strong>${escapeHtml(dashboardCategory)}</strong>`:""}</div><button class="button ghost" data-clear-chart-filters>Limpiar filtros</button></div>`:`<div class="chart-filter-hint">Puedes hacer clic en un mes o una categoría para filtrar las demás visuales.</div>`;
   return `${pageHead("¿En qué se está yendo tu dinero?",`Análisis de ${periodLabel()} en ${meta[state.country].name}.`,filters)}
   ${activeFilters}
-  ${balance?balanceReconciliation(balance,t):`<div class="balance-note"><span>Balance acumulado de movimientos clasificados</span><strong>${money(allTime.balance)}</strong><small>Entradas menos gastos de ${meta[state.country].name}; no representa un saldo bancario conciliado.</small></div>`}
-  <div class="cards">
-    ${metric("Entradas del periodo",money(t.income),`${tx.filter(x=>["ingreso","cobro"].includes(x.type)).length} movimientos de entrada`,"green")}
-    ${metric("Gastos del periodo",money(t.expense),`${tx.filter(x=>x.type==="gasto").length} salidas`,"red")}
-    ${balance&&balance.closing!==null?metric(balance.verified?"Saldo al cierre":"Saldo final estimado",money(balance.closing),balance.verified?`Confirmado al iniciar ${balance.nextLabel}`:"Saldo inicial + entradas − gastos",balance.closing>=0?"green":"red"):metric("Resultado del periodo",money(t.balance),t.balance>=0?"Terminaste por encima de cero":"Gastaste más de lo que entró",t.balance>=0?"green":"red")}
-    ${metric("Gastos ajustables",money(flexible),t.expense?`${Math.round(flexible/t.expense*100)}% de tus gastos`:"Sin gastos en el periodo","yellow")}
-  </div>
+  ${balance?balanceReconciliation(balance):`<div class="balance-note"><span>Balance acumulado de movimientos clasificados</span><strong>${money(allTime.balance)}</strong><small>Entradas menos gastos de ${meta[state.country].name}; no representa un saldo bancario conciliado.</small></div>`}
   <div class="analysis-grid">
     <div class="panel category-panel"><div class="panel-head"><div><h3>Participación por categoría</h3><small>Qué categorías concentran el gasto</small></div></div>${categoryParticipation(groups,categoryTotal)}</div>
     <div class="panel"><div class="panel-head"><div><h3>${dashboardMonth==="all"?"Gasto por mes":"Gasto por semana"}</h3><small>Valores del periodo seleccionado</small></div></div>${spendingTimeline(timelineTx)}</div>
