@@ -239,11 +239,23 @@ function spendingTimeline(tx){
       return {label:fullLabel.slice(0,3),detail:`${fullLabel.charAt(0).toUpperCase()+fullLabel.slice(1)} ${dashboardYear}`,value:expenses.filter(x=>x.date?.slice(5,7)===month).reduce((a,b)=>a+Number(b.amount),0),month};
     });
   }else{
-    const daysInMonth=new Date(Number(dashboardYear),Number(dashboardMonth),0).getDate();
-    buckets=Array.from({length:5},(_,i)=>{
-      const start=i*7+1,end=i===4?daysInMonth:Math.min(daysInMonth,start+6);
-      return {label:`Sem. ${i+1}`,detail:`Días ${start}–${end} de ${periodLabel()}`,value:expenses.filter(x=>Math.min(4,Math.floor((Number(x.date.slice(8,10))-1)/7))===i).reduce((a,b)=>a+Number(b.amount),0),month:""};
-    });
+    const year=Number(dashboardYear),monthIndex=Number(dashboardMonth)-1;
+    const daysInMonth=new Date(Date.UTC(year,monthIndex+1,0)).getUTCDate();
+    const shortDay=date=>date.toLocaleDateString("es",{weekday:"short",day:"numeric",month:"short",timeZone:"UTC"}).replace(/\./g,"");
+    let startDay=1,week=1;
+    while(startDay<=daysInMonth){
+      const startDate=new Date(Date.UTC(year,monthIndex,startDay));
+      const daysUntilSaturday=(6-startDate.getUTCDay()+7)%7;
+      const endDay=Math.min(daysInMonth,startDay+daysUntilSaturday);
+      const endDate=new Date(Date.UTC(year,monthIndex,endDay));
+      const value=expenses.filter(x=>{
+        const day=Number(x.date?.slice(8,10));
+        return day>=startDay&&day<=endDay;
+      }).reduce((a,b)=>a+Number(b.amount),0);
+      buckets.push({label:`Sem. ${week}`,detail:`${shortDay(startDate)} – ${shortDay(endDate)}`,value,month:""});
+      startDay=endDay+1;
+      week++;
+    }
   }
   const max=Math.max(1,...buckets.map(x=>x.value));
   return `<div class="labeled-bars">${buckets.map(x=>{const height=x.value?Math.max(5,x.value/max*72):2,tooltip=`${x.detail} · ${money(x.value)}`;return `<button type="button" class="labeled-bar ${x.month?"is-clickable":""}" ${x.month?`data-month-filter="${x.month}"`:""} data-bar-tooltip="${escapeAttr(tooltip)}" aria-label="${escapeAttr(tooltip)}"><span class="bar-value">${x.value?chartMoney(x.value):"—"}</span><span class="bar-fill" style="height:${height}%"></span><small>${x.label}</small></button>`}).join("")}<div class="bar-tooltip" role="tooltip" aria-hidden="true"></div></div>`;
