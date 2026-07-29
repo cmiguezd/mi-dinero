@@ -1,6 +1,7 @@
 const STORAGE_KEY = "mi-dinero-v3";
 const PERIOD_KEY = "mi-dinero-global-period";
 const THEME_KEY = "mi-dinero-theme";
+const RECURRING_CHECKS_KEY = "mi-dinero-recurring-checks";
 const blankState = () => ({
   version: 3, country: "CN",
   transactions: [], budgets: [], transfers: [], loans: [], recurrings: [],
@@ -36,6 +37,24 @@ function availableCategories(){const imported=countryItems(state.transactions).m
 function pageHead(title,description,action=""){return `<div class="page-head"><div><h2>${title}</h2><p>${description}</p></div>${action}</div>`}
 function empty(title,text){return `<div class="empty"><div><strong>${title}</strong>${text}</div></div>`}
 function savePeriod(){localStorage.setItem(PERIOD_KEY,JSON.stringify({year:dashboardYear,month:dashboardMonth}))}
+function recurringChecks(){
+  try{return JSON.parse(localStorage.getItem(RECURRING_CHECKS_KEY)||"{}")}catch{return {}}
+}
+function isRecurringChecked(id){
+  return Boolean(recurringChecks()[state.country]?.[id]);
+}
+function setRecurringChecked(id,checked){
+  const saved=recurringChecks();
+  saved[state.country]={...(saved[state.country]||{})};
+  if(checked)saved[state.country][id]=true;
+  else delete saved[state.country][id];
+  localStorage.setItem(RECURRING_CHECKS_KEY,JSON.stringify(saved));
+}
+function clearRecurringChecks(){
+  const saved=recurringChecks();
+  delete saved[state.country];
+  localStorage.setItem(RECURRING_CHECKS_KEY,JSON.stringify(saved));
+}
 function applyTheme(theme=colorTheme){
   colorTheme=theme==="light"?"light":"dark";
   document.documentElement.dataset.theme=colorTheme;
@@ -352,8 +371,10 @@ function renderLoans(){
 }
 function renderRecurrings(){
   const items=countryItems(state.recurrings);
-  return `${pageHead("Pagos recurrentes",`Recordatorios de gastos e ingresos periódicos.`,`<button class="button" data-add="recurring">+ Nuevo recurrente</button>`)}
-  <div class="panel table-panel">${items.length?`<div class="transaction-list">${items.map(x=>`<div class="transaction-row"><div class="tx-icon">↻</div><div><strong>${escapeHtml(x.description)}</strong><small>${escapeHtml(x.frequency)} · Próximo: día ${x.day}</small></div><span class="amount ${x.type}">${money(x.amount)}</span><div class="row-actions"><button data-edit="recurring" data-id="${x.id}">✎</button><button data-delete="recurring" data-id="${x.id}">⌫</button></div></div>`).join("")}</div>`:empty("Sin pagos recurrentes","Agrega recordatorios; no crean transacciones automáticamente.")}</div>`;
+  const checkedCount=items.filter(x=>isRecurringChecked(x.id)).length;
+  const actions=`<div class="page-head-actions"><button class="button ghost" type="button" data-clear-recurring-checks ${checkedCount?"":"disabled"}>Limpiar checks</button><button class="button" data-add="recurring">+ Nuevo recurrente</button></div>`;
+  return `${pageHead("Pagos recurrentes",`Recordatorios de gastos e ingresos periódicos.`,actions)}
+  <div class="panel table-panel">${items.length?`<div class="recurring-check-summary"><span><strong>${checkedCount}</strong> de ${items.length} pagados</span><small>Marca cada recurrente cuando quede listo.</small></div><div class="transaction-list recurring-list">${items.map(x=>{const checked=isRecurringChecked(x.id);return `<div class="transaction-row recurring-row ${checked?"is-paid":""}" data-recurring-row="${x.id}"><label class="recurring-check" title="${checked?"Marcar como pendiente":"Marcar como pagado"}"><input type="checkbox" data-recurring-check="${x.id}" ${checked?"checked":""} aria-label="${checked?"Marcar como pendiente":"Marcar como pagado"}: ${escapeAttr(x.description)}"><span aria-hidden="true">✓</span></label><div class="tx-icon">↻</div><div><strong>${escapeHtml(x.description)}</strong><small>${escapeHtml(x.frequency)} · Próximo: día ${x.day}</small></div><span class="amount ${x.type}">${money(x.amount)}</span><div class="row-actions"><button data-edit="recurring" data-id="${x.id}">✎</button><button data-delete="recurring" data-id="${x.id}">⌫</button></div></div>`}).join("")}</div>`:empty("Sin pagos recurrentes","Agrega recordatorios; no crean transacciones automáticamente.")}</div>`;
 }
 function renderSettings(){const cloud=window.MiDineroCloud,connected=cloud?.isConnected(),status=window.miDineroCloudStatus?.text||"Falta configurar Google OAuth";return `${pageHead("Configuración","Administra la apariencia, sincronización y copias de seguridad.")}
   <div class="settings-grid"><div class="panel appearance-panel"><h3>Apariencia</h3><p class="muted">Elige cómo quieres ver la aplicación en este dispositivo.</p><div class="theme-selector" role="group" aria-label="Modo de apariencia"><button type="button" data-theme-option="light" class="${colorTheme==="light"?"active":""}" aria-pressed="${colorTheme==="light"}"><span aria-hidden="true">☀</span><strong>Modo día</strong><small>Fondo claro</small></button><button type="button" data-theme-option="dark" class="${colorTheme==="dark"?"active":""}" aria-pressed="${colorTheme==="dark"}"><span aria-hidden="true">☾</span><strong>Modo noche</strong><small>Fondo oscuro</small></button></div></div><div class="panel"><h3>Cuenta</h3><div class="settings-row"><span>Nombre</span><strong>${escapeHtml(state.settings.user)}</strong></div><div class="settings-row"><span>Almacenamiento</span><strong>${connected?"Google Sheets + dispositivo":"Este dispositivo"}</strong></div><div class="cloud-status" id="cloudStatus">${escapeHtml(status)}</div><div class="form-actions" style="justify-content:flex-start">${connected?`<button class="button" id="syncNow">Sincronizar ahora</button><button class="button ghost" id="disconnectGoogle">Desconectar</button>`:`<button class="button" id="connectGoogle">Conectar Google Sheets</button>`}</div></div>
@@ -365,7 +386,20 @@ function bindPage(){
   $$("[data-edit]").forEach(b=>b.onclick=()=>openForm(b.dataset.edit,b.dataset.id));
   $$("[data-delete]").forEach(b=>b.onclick=()=>askDelete(b.dataset.delete,b.dataset.id));
   $$("[data-go]").forEach(b=>b.onclick=()=>{currentPage=b.dataset.go;render()});
-  $$("[data-pay]").forEach(b=>b.onclick=()=>payLoan(b.dataset.pay));
+  $("[data-pay]").forEach(b=>b.onclick=()=>payLoan(b.dataset.pay));
+  $("[data-recurring-check]").forEach(input=>input.onchange=()=>{
+    setRecurringChecked(input.dataset.recurringCheck,input.checked);
+    render();
+    toast(input.checked?"Recurrente marcado como pagado":"Recurrente marcado como pendiente");
+  });
+  const clearRecurring=$("[data-clear-recurring-checks]");
+  if(clearRecurring)clearRecurring.onclick=()=>{
+    const marked=countryItems(state.recurrings).filter(x=>isRecurringChecked(x.id)).length;
+    if(!marked)return;
+    if(window.confirm(`¿Limpiar ${marked} check${marked===1?"":"s"} de ${meta[state.country].name}?`)){
+      clearRecurringChecks();render();toast("Checks reiniciados");
+    }
+  };
   const search=$("#searchTx"),filter=$("#typeFilter");if(search)search.oninput=filterTransactions;if(filter)filter.onchange=filterTransactions;
   const year=$("#globalYear"),month=$("#globalMonth");if(year)year.onchange=()=>{dashboardYear=year.value;dashboardCategory="";savePeriod();render()};if(month)month.onchange=()=>{dashboardMonth=month.value;savePeriod();render()};
   $$("[data-month-filter]").forEach(b=>b.onclick=()=>{dashboardMonth=dashboardMonth===b.dataset.monthFilter?"all":b.dataset.monthFilter;savePeriod();render()});
