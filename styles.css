@@ -452,3 +452,32 @@ body[data-country="CO"] .labeled-bar .bar-value,body[data-country="CO"] .labeled
     min-height:0;
   }
 }
+
+
+/* Controles uniformes en la cabecera */
+.header-control{
+  display:grid;
+  gap:4px;
+}
+.header-control-label{
+  color:var(--muted);
+  font-size:10px;
+  font-weight:700;
+  line-height:1;
+}
+.country-control .country-switch{
+  height:36px;
+  align-items:center;
+}
+.country-control .country-switch button{
+  height:28px;
+  min-height:28px;
+  padding-top:5px;
+  padding-bottom:5px;
+}
+.global-period .select,
+.global-period .button,
+.country-control .country-switch,
+#refreshButton{
+  height:36px;
+}
