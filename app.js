@@ -386,8 +386,8 @@ function bindPage(){
   $$("[data-edit]").forEach(b=>b.onclick=()=>openForm(b.dataset.edit,b.dataset.id));
   $$("[data-delete]").forEach(b=>b.onclick=()=>askDelete(b.dataset.delete,b.dataset.id));
   $$("[data-go]").forEach(b=>b.onclick=()=>{currentPage=b.dataset.go;render()});
-  $("[data-pay]").forEach(b=>b.onclick=()=>payLoan(b.dataset.pay));
-  $("[data-recurring-check]").forEach(input=>input.onchange=()=>{
+  $$("[data-pay]").forEach(b=>b.onclick=()=>payLoan(b.dataset.pay));
+  $$("[data-recurring-check]").forEach(input=>input.onchange=()=>{
     setRecurringChecked(input.dataset.recurringCheck,input.checked);
     render();
     toast(input.checked?"Recurrente marcado como pagado":"Recurrente marcado como pendiente");
