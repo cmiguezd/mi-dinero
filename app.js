@@ -142,7 +142,7 @@ function signedMoney(value){
   return `${number>0?"+":number<0?"−":""}${money(Math.abs(number))}`;
 }
 function balanceReconciliation(balance){
-  const item=(label,value,detail,tone="")=>`<div class="balance-flow-item ${tone}"><span>${label}</span><strong>${value}</strong></div>`;
+  const item=(label,value,detail,tone="")=>`<div class="balance-flow-item ${tone}"><span>${label}</span><strong>${value}</strong><small>${detail}</small></div>`;
   const opening=balance.opening===null
     ?item("Mes anterior","No disponible","No existe un saldo trasladado")
     :item("Mes anterior",money(balance.opening),"Punto de partida; no cuenta como ingreso");
