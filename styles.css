@@ -397,3 +397,58 @@ body[data-country="CO"] .labeled-bar .bar-value,body[data-country="CO"] .labeled
     gap:6px;
   }
 }
+
+
+/* Ajuste de armonía visual: cabecera, resumen y dona */
+.top-actions{
+  align-items:flex-end;
+}
+#globalPeriodSlot{
+  align-self:flex-end;
+}
+.country-switch,
+#refreshButton{
+  align-self:flex-end;
+}
+.balance-flow-item{
+  align-content:start;
+  grid-template-rows:34px auto minmax(32px,1fr);
+}
+.balance-flow-item span{
+  display:flex;
+  align-items:flex-end;
+  min-height:34px;
+  line-height:1.3;
+}
+.balance-flow-item strong{
+  align-self:start;
+}
+.balance-flow-item small{
+  align-self:start;
+  min-height:32px;
+}
+.category-legend{
+  scrollbar-width:none;
+  -ms-overflow-style:none;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}
+.category-legend::-webkit-scrollbar{
+  width:0;
+  height:0;
+  display:none;
+}
+@media(max-width:1050px){
+  .top-actions{
+    row-gap:10px;
+  }
+}
+@media(max-width:650px){
+  .balance-flow-item{
+    grid-template-rows:auto auto auto;
+  }
+  .balance-flow-item span,
+  .balance-flow-item small{
+    min-height:0;
+  }
+}
