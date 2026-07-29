@@ -393,7 +393,7 @@ function bindPage(){
       barTooltip.style.top=`${Math.max(8,Math.min(wrapRect.height-8,pointerY+(below?14:-14)))}px`;
     };
     const hideBarTooltip=()=>{barTooltip.classList.remove("show","is-below");barTooltip.setAttribute("aria-hidden","true")};
-    $(".labeled-bar",barsWrap).forEach(bar=>{
+    [...barsWrap.querySelectorAll(".labeled-bar")].forEach(bar=>{
       bar.onpointerenter=e=>positionBarTooltip(bar,e.clientX,e.clientY);
       bar.onpointermove=e=>positionBarTooltip(bar,e.clientX,e.clientY);
       bar.onpointerleave=hideBarTooltip;
