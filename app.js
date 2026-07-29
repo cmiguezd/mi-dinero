@@ -138,13 +138,15 @@ function renderDashboard(){
   <div class="analysis-grid lower">
     <div class="panel"><div class="panel-head"><div><h3>Gastos con margen de ajuste</h3><small>Restaurantes, compras, ocio y categorías similares</small></div></div>${flexibleBreakdown(selectedGroups,t.expense)}</div>
     <div class="panel"><div class="panel-head"><h3>Mayores gastos individuales</h3><button class="button ghost" data-go="transacciones">Ver todos</button></div>${largest.length?transactionRows(largest):empty("Sin gastos","No hay salidas en este periodo.")}</div>
-  </div>`;
+  </div>
+  <div class="panel daily-balance-panel"><div class="panel-head"><div><h3>Saldo día a día</h3><small>${dashboardMonth==="all"?"Selecciona un mes para ver cómo fluctuó tu saldo.":"Saldo conciliado al cierre de cada día; incluye entradas, gastos, transferencias y conciliación mensual."}</small></div></div>${dailyBalanceChart()}</div>`;
 }
 function metric(label,value,small,color){return `<article class="metric"><div class="metric-label"><span>${label}</span><i class="dot ${color}"></i></div><div class="metric-value">${value}</div><small>${small}</small></article>`}
 function chartMoney(value){
   const decimals=state.country==="CO"?0:2;
-  const formatted=new Intl.NumberFormat("en-US",{minimumFractionDigits:0,maximumFractionDigits:decimals}).format(Number(value)||0);
-  return `${meta[state.country].symbol}${formatted}`;
+  const number=Number(value)||0;
+  const formatted=new Intl.NumberFormat("en-US",{minimumFractionDigits:0,maximumFractionDigits:decimals}).format(Math.abs(number));
+  return `${number<0?"−":""}${meta[state.country].symbol}${formatted}`;
 }
 function categoryParticipation(groups,total){
   if(!groups.length)return empty("Sin gastos","No hay categorías para el periodo seleccionado.");
@@ -173,6 +175,67 @@ function spendingTimeline(tx){
   }
   const max=Math.max(1,...buckets.map(x=>x.value));
   return `<div class="labeled-bars">${buckets.map(x=>{const height=x.value?Math.max(5,x.value/max*72):2;return `<button type="button" class="labeled-bar ${x.month?"is-clickable":""}" ${x.month?`data-month-filter="${x.month}"`:""} title="${escapeAttr(`${x.label}: ${money(x.value)}`)}"><span class="bar-value">${x.value?chartMoney(x.value):"—"}</span><span class="bar-fill" style="height:${height}%"></span><small>${x.label}</small></button>`}).join("")}</div>`;
+}
+function dailyBalanceChart(){
+  if(dashboardMonth==="all")return `<div class="daily-balance-empty"><strong>Selecciona un mes</strong><span>El gráfico mostrará un punto por cada día y el valor exacto al pasar el cursor.</span></div>`;
+  const opening=openingBalanceForMonth(dashboardYear,dashboardMonth);
+  if(opening===null)return `<div class="daily-balance-empty"><strong>Saldo inicial no disponible</strong><span>Este mes no tiene un saldo trasladado con el cual iniciar el cálculo diario.</span></div>`;
+  const ym=`${dashboardYear}-${dashboardMonth}`;
+  const now=new Date();
+  const daysInMonth=new Date(Number(dashboardYear),Number(dashboardMonth),0).getDate();
+  const isCurrentMonth=String(now.getFullYear())===dashboardYear&&String(now.getMonth()+1).padStart(2,"0")===dashboardMonth;
+  const maxDay=isCurrentMonth?Math.min(now.getDate(),daysInMonth):daysInMonth;
+  const changes=Array.from({length:maxDay+1},()=>0);
+  countryItems(state.transactions).forEach(x=>{
+    if(!x.date?.startsWith(ym)||isCarryForwardTransaction(x))return;
+    const day=Number(x.date.slice(8,10));
+    if(day<1||day>maxDay)return;
+    if(["ingreso","cobro"].includes(x.type))changes[day]+=Number(x.amount)||0;
+    if(x.type==="gasto")changes[day]-=Number(x.amount)||0;
+  });
+  state.transfers.forEach(x=>{
+    if(x.from===state.country&&x.date?.startsWith(ym)){
+      const day=Number(x.date.slice(8,10));
+      if(day>=1&&day<=maxDay)changes[day]-=(Number(x.sent)||0)+(Number(x.fee)||0);
+    }
+    const receivedDate=x.arrivalDate||x.date;
+    if(x.to===state.country&&receivedDate?.startsWith(ym)){
+      const day=Number(receivedDate.slice(8,10));
+      if(day>=1&&day<=maxDay)changes[day]+=Number(x.received)||0;
+    }
+  });
+  const next=shiftedMonth(dashboardYear,dashboardMonth,1);
+  const recordedClosing=openingBalanceForMonth(next.year,next.month);
+  const points=[{day:0,label:"Inicio",value:opening}];
+  let running=opening;
+  for(let day=1;day<=maxDay;day++){
+    running+=changes[day];
+    points.push({day,label:`Día ${day}`,value:running});
+  }
+  if(recordedClosing!==null&&!isCurrentMonth&&points.length>1){
+    points[points.length-1].value=recordedClosing;
+  }
+  const width=960,height=300,pad={left:82,right:24,top:18,bottom:42};
+  const values=points.map(x=>x.value),rawMin=Math.min(...values),rawMax=Math.max(...values);
+  const spread=Math.max(1,rawMax-rawMin),min=rawMin-spread*.12,max=rawMax+spread*.12;
+  const x=i=>pad.left+(i/(points.length-1||1))*(width-pad.left-pad.right);
+  const y=value=>pad.top+(max-value)/(max-min)*(height-pad.top-pad.bottom);
+  const coordinates=points.map((p,i)=>({...p,x:x(i),y:y(p.value)}));
+  const path=coordinates.map((p,i)=>`${i?"L":"M"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+  const area=`${path} L ${coordinates[coordinates.length-1].x.toFixed(2)} ${height-pad.bottom} L ${coordinates[0].x.toFixed(2)} ${height-pad.bottom} Z`;
+  const tickCount=4;
+  const yTicks=Array.from({length:tickCount+1},(_,i)=>{
+    const value=max-(max-min)*i/tickCount,py=pad.top+(height-pad.top-pad.bottom)*i/tickCount;
+    return `<g><line x1="${pad.left}" y1="${py}" x2="${width-pad.right}" y2="${py}" class="daily-grid-line"/><text x="${pad.left-12}" y="${py+4}" text-anchor="end" class="daily-axis-label">${escapeHtml(chartMoney(value))}</text></g>`;
+  }).join("");
+  const labelEvery=Math.max(1,Math.ceil(maxDay/7));
+  const xTicks=coordinates.filter((p,i)=>i===0||i===coordinates.length-1||p.day%labelEvery===0).map(p=>`<text x="${p.x}" y="${height-14}" text-anchor="middle" class="daily-axis-label">${p.day===0?"Inicio":p.day}</text>`).join("");
+  const hits=coordinates.map((p,i)=>{
+    const alignment=i<2?"is-left":i>coordinates.length-3?"is-right":"";
+    const label=`${p.label} · ${chartMoney(p.value)}`;
+    return `<button type="button" class="daily-balance-hit ${alignment}" style="left:${p.x/width*100}%;top:${p.y/height*100}%" data-tooltip="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"></button>`;
+  }).join("");
+  return `<div class="daily-balance-scroll"><div class="daily-balance-chart"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Evolución diaria del saldo en ${escapeAttr(periodLabel())}"><defs><linearGradient id="dailyBalanceArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--accent)" stop-opacity=".30"/><stop offset="100%" stop-color="var(--accent)" stop-opacity=".02"/></linearGradient></defs>${yTicks}<path d="${area}" class="daily-balance-area"/><path d="${path}" class="daily-balance-line"/>${coordinates.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3.5" class="daily-balance-dot"/>`).join("")}${xTicks}</svg>${hits}</div></div><div class="daily-balance-summary"><span>Saldo inicial <strong>${chartMoney(opening)}</strong></span><span>${recordedClosing!==null&&!isCurrentMonth?"Saldo final conciliado":"Saldo al último día registrado"} <strong>${chartMoney(points[points.length-1].value)}</strong></span></div>`;
 }
 function flexibleBreakdown(groups,total){
   const items=groups.filter(([c])=>isFlexibleCategory(c)).slice(0,7);
