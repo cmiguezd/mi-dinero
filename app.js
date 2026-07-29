@@ -58,14 +58,11 @@ function globalPeriodBar(){
   if(!["resumen","transacciones","presupuestos"].includes(currentPage))return "";
   const years=periodOptions();
   const monthNames=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-  return `<section class="global-period" aria-label="Periodo global">
-    <div class="global-period-title"><span>Periodo global</span><strong>${periodLabel()}</strong></div>
-    <div class="period-filters">
-      <label>Año<select class="select" id="globalYear">${years.map(y=>`<option ${y===dashboardYear?"selected":""}>${y}</option>`).join("")}</select></label>
-      <label>Mes<select class="select" id="globalMonth"><option value="all">Todo el año</option>${monthNames.map((m,i)=>{const value=String(i+1).padStart(2,"0");return `<option value="${value}" ${dashboardMonth===value?"selected":""}>${m}</option>`}).join("")}</select></label>
-      <button type="button" class="button ghost" data-clear-period>Limpiar</button>
-    </div>
-  </section>`;
+  return `<div class="global-period" aria-label="Periodo global">
+    <label>Año<select class="select" id="globalYear">${years.map(y=>`<option ${y===dashboardYear?"selected":""}>${y}</option>`).join("")}</select></label>
+    <label>Mes<select class="select" id="globalMonth"><option value="all">Todo el año</option>${monthNames.map((m,i)=>{const value=String(i+1).padStart(2,"0");return `<option value="${value}" ${dashboardMonth===value?"selected":""}>${m}</option>`}).join("")}</select></label>
+    <button type="button" class="button ghost" data-clear-period>Limpiar</button>
+  </div>`;
 }
 function isCarryForwardTransaction(x){
   if(x.type!=="ajuste")return false;
@@ -169,7 +166,8 @@ function render(){
   $$(".nav-item").forEach(x=>x.classList.toggle("active",x.dataset.page===currentPage));
   document.querySelectorAll("#countrySwitch button").forEach(x=>x.classList.toggle("active",x.dataset.country===state.country));
   const views={resumen:renderDashboard,transacciones:renderTransactions,presupuestos:renderBudgets,transferencias:renderTransfers,prestamos:renderLoans,recurrentes:renderRecurrings,configuracion:renderSettings};
-  $("#content").innerHTML=globalPeriodBar()+views[currentPage]();
+  $("#globalPeriodSlot").innerHTML=globalPeriodBar();
+  $("#content").innerHTML=views[currentPage]();
   bindPage();
 }
 function totals(tx=countryItems(state.transactions)){
