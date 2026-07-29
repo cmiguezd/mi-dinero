@@ -246,7 +246,7 @@ function spendingTimeline(tx){
     });
   }
   const max=Math.max(1,...buckets.map(x=>x.value));
-  return `<div class="labeled-bars">${buckets.map(x=>{const height=x.value?Math.max(5,x.value/max*72):2,tooltip=`${x.detail} · ${money(x.value)}`;return `<button type="button" class="labeled-bar ${x.month?"is-clickable":""}" ${x.month?`data-month-filter="${x.month}"`:""} data-bar-tooltip="${escapeAttr(tooltip)}" aria-label="${escapeAttr(tooltip)}"><span class="bar-value">${x.value?chartMoney(x.value):"—"}</span><span class="bar-fill" style="height:${height}%"></span><small>${x.label}</small></button>`}).join("")}</div>`;
+  return `<div class="labeled-bars">${buckets.map(x=>{const height=x.value?Math.max(5,x.value/max*72):2,tooltip=`${x.detail} · ${money(x.value)}`;return `<button type="button" class="labeled-bar ${x.month?"is-clickable":""}" ${x.month?`data-month-filter="${x.month}"`:""} data-bar-tooltip="${escapeAttr(tooltip)}" aria-label="${escapeAttr(tooltip)}"><span class="bar-value">${x.value?chartMoney(x.value):"—"}</span><span class="bar-fill" style="height:${height}%"></span><small>${x.label}</small></button>`}).join("")}<div class="bar-tooltip" role="tooltip" aria-hidden="true"></div></div>`;
 }
 function dailyBalanceChart(){
   if(dashboardMonth==="all")return `<div class="daily-balance-empty"><strong>Selecciona un mes</strong><span>El gráfico mostrará un punto por cada día y el valor exacto al pasar el cursor.</span></div>`;
@@ -374,6 +374,31 @@ function bindPage(){
       segment.onpointerleave=hideDonutTooltip;
       segment.onfocus=()=>{const wrapRect=donutWrap.getBoundingClientRect(),rect=segment.getBoundingClientRect();showDonutTooltip(segment,rect.left+rect.width/2-wrapRect.left,rect.top-wrapRect.top)};
       segment.onblur=hideDonutTooltip;
+    });
+  }
+  const barsWrap=$(".labeled-bars"),barTooltip=$(".bar-tooltip");
+  if(barsWrap&&barTooltip){
+    const positionBarTooltip=(bar,clientX,clientY)=>{
+      barTooltip.textContent=bar.dataset.barTooltip;
+      barTooltip.classList.add("show");
+      barTooltip.setAttribute("aria-hidden","false");
+      const wrapRect=barsWrap.getBoundingClientRect();
+      const tipRect=barTooltip.getBoundingClientRect();
+      const half=tipRect.width/2;
+      const x=Math.max(half+8,Math.min(wrapRect.width-half-8,clientX-wrapRect.left));
+      const pointerY=clientY-wrapRect.top;
+      const below=pointerY<tipRect.height+22;
+      barTooltip.classList.toggle("is-below",below);
+      barTooltip.style.left=`${x}px`;
+      barTooltip.style.top=`${Math.max(8,Math.min(wrapRect.height-8,pointerY+(below?14:-14)))}px`;
+    };
+    const hideBarTooltip=()=>{barTooltip.classList.remove("show","is-below");barTooltip.setAttribute("aria-hidden","true")};
+    $(".labeled-bar",barsWrap).forEach(bar=>{
+      bar.onpointerenter=e=>positionBarTooltip(bar,e.clientX,e.clientY);
+      bar.onpointermove=e=>positionBarTooltip(bar,e.clientX,e.clientY);
+      bar.onpointerleave=hideBarTooltip;
+      bar.addEventListener("focus",()=>{const rect=bar.getBoundingClientRect();positionBarTooltip(bar,rect.left+rect.width/2,rect.top+Math.max(48,rect.height*.42))});
+      bar.addEventListener("blur",hideBarTooltip);
     });
   }
   const clearChartFilters=$("[data-clear-chart-filters]");if(clearChartFilters)clearChartFilters.onclick=()=>{dashboardCategory="";render()};
