@@ -691,6 +691,7 @@ html[data-theme="light"] body[data-country="CO"] .button.ghost:hover{border-colo
 }
 .recurring-row{
   position:relative;
+  grid-template-columns:30px 42px minmax(0,1fr) auto auto;
   transition:background .2s,border-color .2s,box-shadow .2s;
 }
 .recurring-row.is-paid{
@@ -749,6 +750,13 @@ html[data-theme="light"] .recurring-row.is-paid{
 }
 html[data-theme="light"] .recurring-check span{
   background:#fff;
+  border-color:#cfd4dc;
+  color:transparent;
+}
+html[data-theme="light"] .recurring-check input:checked+span{
+  background:var(--green);
+  border-color:var(--green);
+  color:#fff;
 }
 @media(max-width:650px){
   .page-head-actions{
