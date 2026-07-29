@@ -136,7 +136,7 @@ body[data-country="CO"] .labeled-bar .bar-value,body[data-country="CO"] .labeled
 }
 
 .balance-flow{
-  grid-template-columns:repeat(5,minmax(0,1fr));
+  grid-template-columns:repeat(6,minmax(0,1fr));
   gap:15px;
   border:0;
   border-left:0;
@@ -176,7 +176,7 @@ body[data-country="CO"] .labeled-bar .bar-value,body[data-country="CO"] .labeled
 
 @media(max-width:1100px){
   .balance-flow{
-    grid-template-columns:repeat(2,minmax(0,1fr));
+    grid-template-columns:repeat(3,minmax(0,1fr));
   }
   .balance-flow-item,
   .balance-flow-item:nth-last-child(-n+2),
