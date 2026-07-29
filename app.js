@@ -187,7 +187,7 @@ function totals(tx=countryItems(state.transactions)){
   return {income,expense,balance:income-expense,count:tx.length};
 }
 function renderDashboard(){
-  const tx=dashboardTransactions(), categoryTx=dashboardTransactions({ignoreCategory:true}), timelineTx=dashboardTransactions({ignoreMonth:true}), t=totals(tx), allTime=totals(), balance=monthlyBalanceReconciliation(t);
+  const tx=dashboardTransactions(), categoryTx=dashboardTransactions({ignoreCategory:true}), timelineTx=dashboardTransactions({ignoreCategory:true}), t=totals(tx), allTime=totals(), balance=monthlyBalanceReconciliation(t);
   const groups=expenseGroups(categoryTx), selectedGroups=expenseGroups(tx), categoryTotal=totals(categoryTx).expense, flexible=selectedGroups.filter(([c])=>isFlexibleCategory(c)).reduce((a,[,v])=>a+v,0);
   const largest=tx.filter(x=>x.type==="gasto").sort((a,b)=>Number(b.amount)-Number(a.amount)).slice(0,5);
   const monthNames=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -233,12 +233,20 @@ function spendingTimeline(tx){
   const expenses=tx.filter(x=>x.type==="gasto");
   let buckets=[];
   if(dashboardMonth==="all"){
-    buckets=Array.from({length:12},(_,i)=>({label:new Date(Number(dashboardYear),i,1).toLocaleString("es",{month:"short"}),value:expenses.filter(x=>Number(x.date.slice(5,7))===i+1).reduce((a,b)=>a+Number(b.amount),0),month:String(i+1).padStart(2,"0")}));
+    buckets=Array.from({length:12},(_,i)=>{
+      const month=String(i+1).padStart(2,"0");
+      const fullLabel=new Date(Number(dashboardYear),i,1).toLocaleString("es",{month:"long"});
+      return {label:fullLabel.slice(0,3),detail:`${fullLabel.charAt(0).toUpperCase()+fullLabel.slice(1)} ${dashboardYear}`,value:expenses.filter(x=>x.date?.slice(5,7)===month).reduce((a,b)=>a+Number(b.amount),0),month};
+    });
   }else{
-    buckets=Array.from({length:5},(_,i)=>({label:`Sem. ${i+1}`,value:expenses.filter(x=>Math.min(4,Math.floor((Number(x.date.slice(8,10))-1)/7))===i).reduce((a,b)=>a+Number(b.amount),0),month:""}));
+    const daysInMonth=new Date(Number(dashboardYear),Number(dashboardMonth),0).getDate();
+    buckets=Array.from({length:5},(_,i)=>{
+      const start=i*7+1,end=i===4?daysInMonth:Math.min(daysInMonth,start+6);
+      return {label:`Sem. ${i+1}`,detail:`Días ${start}–${end} de ${periodLabel()}`,value:expenses.filter(x=>Math.min(4,Math.floor((Number(x.date.slice(8,10))-1)/7))===i).reduce((a,b)=>a+Number(b.amount),0),month:""};
+    });
   }
   const max=Math.max(1,...buckets.map(x=>x.value));
-  return `<div class="labeled-bars">${buckets.map(x=>{const height=x.value?Math.max(5,x.value/max*72):2;return `<button type="button" class="labeled-bar ${x.month?"is-clickable":""}" ${x.month?`data-month-filter="${x.month}"`:""} title="${escapeAttr(`${x.label}: ${money(x.value)}`)}"><span class="bar-value">${x.value?chartMoney(x.value):"—"}</span><span class="bar-fill" style="height:${height}%"></span><small>${x.label}</small></button>`}).join("")}</div>`;
+  return `<div class="labeled-bars">${buckets.map(x=>{const height=x.value?Math.max(5,x.value/max*72):2,tooltip=`${x.detail} · ${money(x.value)}`;return `<button type="button" class="labeled-bar ${x.month?"is-clickable":""}" ${x.month?`data-month-filter="${x.month}"`:""} data-bar-tooltip="${escapeAttr(tooltip)}" aria-label="${escapeAttr(tooltip)}"><span class="bar-value">${x.value?chartMoney(x.value):"—"}</span><span class="bar-fill" style="height:${height}%"></span><small>${x.label}</small></button>`}).join("")}</div>`;
 }
 function dailyBalanceChart(){
   if(dashboardMonth==="all")return `<div class="daily-balance-empty"><strong>Selecciona un mes</strong><span>El gráfico mostrará un punto por cada día y el valor exacto al pasar el cursor.</span></div>`;
