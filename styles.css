@@ -481,3 +481,41 @@ body[data-country="CO"] .labeled-bar .bar-value,body[data-country="CO"] .labeled
 #refreshButton{
   height:36px;
 }
+
+
+/* Dona compacta y mejor aprovechamiento del panel */
+.category-visual{
+  grid-template-columns:minmax(220px,28%) minmax(0,1fr);
+  gap:16px;
+  min-height:0;
+  height:270px;
+  align-items:center;
+}
+.donut-wrap{
+  width:220px;
+  max-width:100%;
+}
+.category-legend{
+  max-height:250px;
+  gap:3px;
+  padding-right:0;
+  -webkit-mask-image:linear-gradient(to bottom,#000 0,#000 calc(100% - 14px),transparent 100%);
+  mask-image:linear-gradient(to bottom,#000 0,#000 calc(100% - 14px),transparent 100%);
+}
+.category-legend>button{
+  padding:4px 5px;
+}
+@media(max-width:780px){
+  .category-visual{
+    grid-template-columns:1fr;
+    height:auto;
+    gap:16px;
+  }
+  .donut-wrap{
+    width:200px;
+  }
+  .category-legend{
+    width:100%;
+    max-height:260px;
+  }
+}
