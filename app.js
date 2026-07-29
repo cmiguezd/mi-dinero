@@ -142,17 +142,17 @@ function signedMoney(value){
   return `${number>0?"+":number<0?"−":""}${money(Math.abs(number))}`;
 }
 function balanceReconciliation(balance){
-  const item=(label,value,detail,tone="")=>`<div class="balance-flow-item ${tone}"><span>${label}</span></div>`;
+  const item=(label,value,detail,tone="")=>`<div class="balance-flow-item ${tone}"><span>${label}</span><strong>${value}</strong></div>`;
   const opening=balance.opening===null
-    ?item("1. Mes anterior","No disponible","No existe un saldo trasladado")
-    :item("1. Mes anterior",money(balance.opening),"Punto de partida; no cuenta como ingreso");
-  const income=item("2. Ingresos del mes",`+${money(balance.income)}`,"Ingresos reales, sin préstamos","in");
-  const loans=item("3. Préstamos y deudas",signedMoney(balance.loanFlow),balance.loanCount?"Entradas y pagos de capital del mes":"Sin movimientos de deuda",balance.loanFlow<0?"out":balance.loanFlow>0?"in":"");
-  const transfers=item("4. Transferencias y ajustes",signedMoney(balance.transferAndAdjustments),"Movimientos de caja fuera de ingresos y gastos",balance.transferAndAdjustments<0?"out":balance.transferAndAdjustments>0?"in":"");
-  const expenses=item("5. Gastos del mes",`−${money(balance.expense)}`,"Consumo y gastos reales","out");
+    ?item("Mes anterior","No disponible","No existe un saldo trasladado")
+    :item("Mes anterior",money(balance.opening),"Punto de partida; no cuenta como ingreso");
+  const income=item("Ingresos del mes",`+${money(balance.income)}`,"Ingresos reales, sin préstamos","in");
+  const loans=item("Préstamos y deudas",signedMoney(balance.loanFlow),balance.loanCount?"Entradas y pagos de capital del mes":"Sin movimientos de deuda",balance.loanFlow<0?"out":balance.loanFlow>0?"in":"");
+  const transfers=item("Transferencias y ajustes",signedMoney(balance.transferAndAdjustments),"Movimientos de caja fuera de ingresos y gastos",balance.transferAndAdjustments<0?"out":balance.transferAndAdjustments>0?"in":"");
+  const expenses=item("Gastos del mes",`−${money(balance.expense)}`,"Consumo y gastos reales","out");
   const closing=balance.closing===null
-    ?item("6. Saldo final","No disponible","Falta un saldo de apertura o cierre")
-    :item(balance.verified?"6. Saldo final":"6. Saldo final estimado",money(balance.closing),balance.verified?`Conciliado con ${balance.nextLabel}`:"Resultado de las cinco tarjetas anteriores",balance.closing<0?"out":"in");
+    ?item("Saldo final","No disponible","Falta un saldo de apertura o cierre")
+    :item(balance.verified?"Saldo final":"Saldo final estimado",money(balance.closing),balance.verified?`Conciliado con ${balance.nextLabel}`:"Resultado de las cinco tarjetas anteriores",balance.closing<0?"out":"in");
   return `<div class="balance-flow">${opening}${income}${loans}${transfers}${expenses}${closing}</div>`;
 }
 function expenseGroups(tx=dashboardTransactions()){
