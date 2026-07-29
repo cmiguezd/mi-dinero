@@ -661,3 +661,106 @@ html[data-theme="light"] body[data-country="CO"] .button.ghost:hover{border-colo
   outline:2px solid color-mix(in srgb,var(--accent) 70%,transparent);
   outline-offset:2px;
 }
+
+
+/* Lista de verificación de pagos recurrentes */
+.page-head-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+.button:disabled{
+  opacity:.42;
+  cursor:not-allowed;
+  transform:none;
+}
+.recurring-check-summary{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  padding:0 4px 12px;
+  color:var(--muted);
+  font-size:11px;
+}
+.recurring-check-summary strong{
+  color:var(--text);
+  font-size:13px;
+}
+.recurring-row{
+  position:relative;
+  transition:background .2s,border-color .2s,box-shadow .2s;
+}
+.recurring-row.is-paid{
+  background:color-mix(in srgb,var(--green) 14%,var(--panel));
+  box-shadow:inset 3px 0 0 var(--green);
+}
+.recurring-row.is-paid .tx-icon{
+  background:color-mix(in srgb,var(--green) 22%,var(--panel2));
+  color:var(--green);
+}
+.recurring-row.is-paid>div:nth-of-type(2)>strong{
+  color:var(--green);
+}
+.recurring-check{
+  position:relative;
+  width:22px;
+  height:22px;
+  flex:0 0 22px;
+  cursor:pointer;
+}
+.recurring-check input{
+  position:absolute;
+  width:1px;
+  height:1px;
+  opacity:0;
+  pointer-events:none;
+}
+.recurring-check span{
+  width:22px;
+  height:22px;
+  display:grid;
+  place-items:center;
+  border:1px solid var(--line);
+  border-radius:7px;
+  background:var(--panel2);
+  color:transparent;
+  font-size:13px;
+  font-weight:800;
+  transition:background .18s,border-color .18s,color .18s,box-shadow .18s;
+}
+.recurring-check:hover span{
+  border-color:var(--green);
+}
+.recurring-check input:focus-visible+span{
+  outline:2px solid color-mix(in srgb,var(--green) 55%,transparent);
+  outline-offset:2px;
+}
+.recurring-check input:checked+span{
+  border-color:var(--green);
+  background:var(--green);
+  color:#fff;
+  box-shadow:0 0 0 4px color-mix(in srgb,var(--green) 16%,transparent);
+}
+html[data-theme="light"] .recurring-row.is-paid{
+  background:color-mix(in srgb,var(--green) 11%,#fff);
+}
+html[data-theme="light"] .recurring-check span{
+  background:#fff;
+}
+@media(max-width:650px){
+  .page-head-actions{
+    width:100%;
+    justify-content:flex-start;
+  }
+  .recurring-check-summary{
+    align-items:flex-start;
+    flex-direction:column;
+    gap:3px;
+  }
+  .recurring-row{
+    grid-template-columns:22px 36px minmax(0,1fr) auto;
+  }
+}
