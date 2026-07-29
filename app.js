@@ -1,4 +1,5 @@
 const STORAGE_KEY = "mi-dinero-v3";
+const PERIOD_KEY = "mi-dinero-global-period";
 const blankState = () => ({
   version: 3, country: "CN",
   transactions: [], budgets: [], transfers: [], loans: [], recurrings: [],
@@ -7,8 +8,9 @@ const blankState = () => ({
 let state = loadState();
 let currentPage = "resumen";
 let pendingDelete = null;
-let dashboardYear = "";
-let dashboardMonth = "all";
+const savedPeriod = (()=>{try{return JSON.parse(localStorage.getItem(PERIOD_KEY)||"{}")}catch{return {}}})();
+let dashboardYear = savedPeriod.year||"";
+let dashboardMonth = savedPeriod.month||"all";
 let dashboardCategory = "";
 const $ = (s, root=document) => root.querySelector(s);
 const $$ = (s, root=document) => [...root.querySelectorAll(s)];
@@ -31,6 +33,7 @@ function countryItems(arr){return arr.filter(x=>x.country===state.country)}
 function availableCategories(){const imported=countryItems(state.transactions).map(x=>x.category).filter(Boolean);return [...new Set([...imported,...fallbackCategories])].sort((a,b)=>a.localeCompare(b,"es"))}
 function pageHead(title,description,action=""){return `<div class="page-head"><div><h2>${title}</h2><p>${description}</p></div>${action}</div>`}
 function empty(title,text){return `<div class="empty"><div><strong>${title}</strong>${text}</div></div>`}
+function savePeriod(){localStorage.setItem(PERIOD_KEY,JSON.stringify({year:dashboardYear,month:dashboardMonth}))}
 
 function periodOptions(){
   const tx=countryItems(state.transactions).filter(x=>x.date);
@@ -50,6 +53,19 @@ function periodLabel(){
   if(dashboardMonth==="all")return `Año ${dashboardYear}`;
   const label=new Date(`${dashboardYear}-${dashboardMonth}-01T12:00:00`).toLocaleString("es",{month:"long"});
   return `${label.charAt(0).toUpperCase()+label.slice(1)} ${dashboardYear}`;
+}
+function globalPeriodBar(){
+  if(!["resumen","transacciones","presupuestos"].includes(currentPage))return "";
+  const years=periodOptions();
+  const monthNames=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  return `<section class="global-period" aria-label="Periodo global">
+    <div class="global-period-title"><span>Periodo global</span><strong>${periodLabel()}</strong></div>
+    <div class="period-filters">
+      <label>Año<select class="select" id="globalYear">${years.map(y=>`<option ${y===dashboardYear?"selected":""}>${y}</option>`).join("")}</select></label>
+      <label>Mes<select class="select" id="globalMonth"><option value="all">Todo el año</option>${monthNames.map((m,i)=>{const value=String(i+1).padStart(2,"0");return `<option value="${value}" ${dashboardMonth===value?"selected":""}>${m}</option>`}).join("")}</select></label>
+      <button type="button" class="button ghost" data-clear-period>Limpiar</button>
+    </div>
+  </section>`;
 }
 function isCarryForwardTransaction(x){
   if(x.type!=="ajuste")return false;
@@ -153,7 +169,7 @@ function render(){
   $$(".nav-item").forEach(x=>x.classList.toggle("active",x.dataset.page===currentPage));
   document.querySelectorAll("#countrySwitch button").forEach(x=>x.classList.toggle("active",x.dataset.country===state.country));
   const views={resumen:renderDashboard,transacciones:renderTransactions,presupuestos:renderBudgets,transferencias:renderTransfers,prestamos:renderLoans,recurrentes:renderRecurrings,configuracion:renderSettings};
-  $("#content").innerHTML=views[currentPage]();
+  $("#content").innerHTML=globalPeriodBar()+views[currentPage]();
   bindPage();
 }
 function totals(tx=countryItems(state.transactions)){
@@ -162,13 +178,12 @@ function totals(tx=countryItems(state.transactions)){
   return {income,expense,balance:income-expense,count:tx.length};
 }
 function renderDashboard(){
-  const years=periodOptions(), tx=dashboardTransactions(), categoryTx=dashboardTransactions({ignoreCategory:true}), timelineTx=dashboardTransactions({ignoreMonth:true}), t=totals(tx), allTime=totals(), balance=monthlyBalanceReconciliation(t);
+  const tx=dashboardTransactions(), categoryTx=dashboardTransactions({ignoreCategory:true}), timelineTx=dashboardTransactions({ignoreMonth:true}), t=totals(tx), allTime=totals(), balance=monthlyBalanceReconciliation(t);
   const groups=expenseGroups(categoryTx), selectedGroups=expenseGroups(tx), categoryTotal=totals(categoryTx).expense, flexible=selectedGroups.filter(([c])=>isFlexibleCategory(c)).reduce((a,[,v])=>a+v,0);
   const largest=tx.filter(x=>x.type==="gasto").sort((a,b)=>Number(b.amount)-Number(a.amount)).slice(0,5);
   const monthNames=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-  const filters=`<div class="period-filters"><label>Año<select class="select" id="dashboardYear">${years.map(y=>`<option ${y===dashboardYear?"selected":""}>${y}</option>`).join("")}</select></label><label>Mes<select class="select" id="dashboardMonth"><option value="all">Todo el año</option>${monthNames.map((m,i)=>`<option value="${String(i+1).padStart(2,"0")}" ${dashboardMonth===String(i+1).padStart(2,"0")?"selected":""}>${m}</option>`).join("")}</select></label></div>`;
   const activeFilters=dashboardMonth!=="all"||dashboardCategory?`<div class="chart-filter-status" aria-live="polite"><div><span>Vista filtrada</span>${dashboardMonth!=="all"?`<strong>${monthNames[Number(dashboardMonth)-1]} ${dashboardYear}</strong>`:""}${dashboardCategory?`<strong>${escapeHtml(dashboardCategory)}</strong>`:""}</div><button class="button ghost" data-clear-chart-filters>Limpiar filtros</button></div>`:`<div class="chart-filter-hint">Puedes hacer clic en un mes o una categoría para filtrar las demás visuales.</div>`;
-  return `${pageHead("¿En qué se está yendo tu dinero?",`Análisis de ${periodLabel()} en ${meta[state.country].name}.`,filters)}
+  return `${pageHead("¿En qué se está yendo tu dinero?",`Análisis de ${periodLabel()} en ${meta[state.country].name}.`)}
   ${activeFilters}
   ${balance?balanceReconciliation(balance):`<div class="balance-note"><span>Balance acumulado de movimientos clasificados</span><strong>${money(allTime.balance)}</strong><small>Entradas menos gastos de ${meta[state.country].name}; no representa un saldo bancario conciliado.</small></div>`}
   <div class="analysis-grid">
@@ -283,17 +298,18 @@ function flexibleBreakdown(groups,total){
   return `<div class="rank-list">${items.map(([c,v],i)=>`<div class="rank-item"><span class="rank-number">${i+1}</span><div><div class="rank-label"><strong>${escapeHtml(c)}</strong><span>${money(v)} · ${total?Math.round(v/total*100):0}%</span></div><div class="rank-track"><i style="width:${v/max*100}%"></i></div></div></div>`).join("")}</div>`;
 }
 function renderTransactions(){
-  const tx=countryItems(state.transactions).sort((a,b)=>b.date.localeCompare(a.date));
-  return `${pageHead("Todos tus movimientos",`${tx.length} registros en ${meta[state.country].name}.`,`<button class="button" data-add="transaction">+ Nueva transacción</button>`)}
+  const tx=dashboardTransactions({ignoreCategory:true}).sort((a,b)=>b.date.localeCompare(a.date));
+  return `${pageHead("Todos tus movimientos",`${tx.length} registros de ${periodLabel()} en ${meta[state.country].name}.`,`<button class="button" data-add="transaction">+ Nueva transacción</button>`)}
   <div class="filters"><input class="input" id="searchTx" placeholder="Buscar por descripción o categoría"><select class="select" id="typeFilter"><option value="">Todos los tipos</option><option value="gasto">Gastos</option><option value="ingreso">Ingresos</option><option value="cobro">Cobros</option><option value="ajuste">Ajustes</option></select></div>
   <div class="panel table-panel" id="txList">${tx.length?transactionRows(tx):empty("Aún no hay transacciones","Registra un gasto, ingreso, cobro o ajuste.")}</div>`;
 }
 function transactionRows(tx){return `<div class="transaction-list">${tx.map(x=>`<div class="transaction-row" data-search="${(x.description+" "+x.category+" "+x.type).toLowerCase()}" data-type="${x.type}"><div class="tx-icon">${x.type==="gasto"?"↓":"↑"}</div><div><strong>${escapeHtml(x.description)}</strong><small>${escapeHtml(x.category)} · ${dateLabel(x.date)}</small></div><span class="amount ${x.type}">${x.type==="gasto"?"−":"+"}${money(x.amount,x.country)}</span><div class="row-actions"><button data-edit="transaction" data-id="${x.id}" title="Editar">✎</button><button data-delete="transaction" data-id="${x.id}" title="Eliminar">⌫</button></div></div>`).join("")}</div>`}
-function spentByCategory(category){return countryItems(state.transactions).filter(x=>x.type==="gasto"&&x.category===category).reduce((a,b)=>a+Number(b.amount),0)}
+function spentByCategory(category){return dashboardTransactions({ignoreCategory:true}).filter(x=>x.type==="gasto"&&x.category===category).reduce((a,b)=>a+Number(b.amount),0)}
 function renderBudgets(){
   const items=countryItems(state.budgets);
-  return `${pageHead("Presupuestos",`Controla cuánto puedes gastar por categoría.`,`<button class="button" data-add="budget">+ Nuevo presupuesto</button>`)}
-  <div class="budget-grid">${items.length?items.map(x=>{const spent=spentByCategory(x.category),pct=Math.min(100,Math.round(spent/Number(x.amount)*100)||0);return `<article class="panel budget-card"><div class="budget-top"><div><small class="muted">${escapeHtml(x.category)}</small><h3>${money(x.amount)}</h3></div><div class="row-actions"><button data-edit="budget" data-id="${x.id}">✎</button><button data-delete="budget" data-id="${x.id}">⌫</button></div></div><div class="progress"><span style="width:${pct}%"></span></div><div class="budget-values"><span>Usado ${money(spent)}</span><span>${pct}%</span></div></article>`}).join(""):empty("Sin presupuestos","Define un límite para comenzar.")}</div>`;
+  const months=dashboardMonth==="all"?12:1;
+  return `${pageHead("Presupuestos",`Límites y gastos de ${periodLabel()} en ${meta[state.country].name}.`,`<button class="button" data-add="budget">+ Nuevo presupuesto</button>`)}
+  <div class="budget-grid">${items.length?items.map(x=>{const monthly=Number(x.amount)||0,limit=monthly*months,spent=spentByCategory(x.category),rawPct=limit?Math.round(spent/limit*100):0,pct=Math.min(100,rawPct);return `<article class="panel budget-card"><div class="budget-top"><div><small class="muted">${escapeHtml(x.category)} · ${escapeHtml(periodLabel())}</small><h3>${money(limit)}</h3><small class="muted">${dashboardMonth==="all"?`${money(monthly)} al mes × 12 meses`:"Límite mensual"}</small></div><div class="row-actions"><button data-edit="budget" data-id="${x.id}">✎</button><button data-delete="budget" data-id="${x.id}">⌫</button></div></div><div class="progress"><span style="width:${pct}%"></span></div><div class="budget-values"><span>Usado ${money(spent)}</span><span>${rawPct}%</span></div></article>`}).join(""):empty("Sin presupuestos","Define un límite para comenzar.")}</div>`;
 }
 function renderTransfers(){
   const items=state.transfers.filter(x=>x.from===state.country||x.to===state.country).sort((a,b)=>b.date.localeCompare(a.date));
@@ -322,10 +338,11 @@ function bindPage(){
   $$("[data-go]").forEach(b=>b.onclick=()=>{currentPage=b.dataset.go;render()});
   $$("[data-pay]").forEach(b=>b.onclick=()=>payLoan(b.dataset.pay));
   const search=$("#searchTx"),filter=$("#typeFilter");if(search)search.oninput=filterTransactions;if(filter)filter.onchange=filterTransactions;
-  const year=$("#dashboardYear"),month=$("#dashboardMonth");if(year)year.onchange=()=>{dashboardYear=year.value;dashboardCategory="";render()};if(month)month.onchange=()=>{dashboardMonth=month.value;render()};
-  $$("[data-month-filter]").forEach(b=>b.onclick=()=>{dashboardMonth=dashboardMonth===b.dataset.monthFilter?"all":b.dataset.monthFilter;render()});
+  const year=$("#globalYear"),month=$("#globalMonth");if(year)year.onchange=()=>{dashboardYear=year.value;dashboardCategory="";savePeriod();render()};if(month)month.onchange=()=>{dashboardMonth=month.value;savePeriod();render()};
+  $$("[data-month-filter]").forEach(b=>b.onclick=()=>{dashboardMonth=dashboardMonth===b.dataset.monthFilter?"all":b.dataset.monthFilter;savePeriod();render()});
   $$("[data-category-filter]").forEach(b=>{b.onclick=()=>{dashboardCategory=dashboardCategory===b.dataset.categoryFilter?"":b.dataset.categoryFilter;render()};b.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();b.click()}}});
-  const clearChartFilters=$("[data-clear-chart-filters]");if(clearChartFilters)clearChartFilters.onclick=()=>{dashboardMonth="all";dashboardCategory="";render()};
+  const clearChartFilters=$("[data-clear-chart-filters]");if(clearChartFilters)clearChartFilters.onclick=()=>{dashboardCategory="";render()};
+  const clearPeriod=$("[data-clear-period]");if(clearPeriod)clearPeriod.onclick=()=>{dashboardYear=periodOptions()[0]||String(new Date().getFullYear());dashboardMonth="all";dashboardCategory="";savePeriod();render()};
   if($("#exportData"))$("#exportData").onclick=exportData;if($("#importData"))$("#importData").onchange=importData;if($("#resetData"))$("#resetData").onclick=()=>askDelete("all","all");
   if($("#connectGoogle"))$("#connectGoogle").onclick=()=>window.MiDineroCloud?.connect();if($("#disconnectGoogle"))$("#disconnectGoogle").onclick=()=>window.MiDineroCloud?.disconnect();if($("#syncNow"))$("#syncNow").onclick=()=>window.MiDineroCloud?.pull();if($("#saveCloudConfig"))$("#saveCloudConfig").onclick=saveCloudConfig;
 }
