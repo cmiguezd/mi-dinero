@@ -556,3 +556,55 @@ body[data-country="CO"] .labeled-bar .bar-value,body[data-country="CO"] .labeled
   opacity:1;
   transform:translate(-50%,calc(-100% - 12px)) translateY(0);
 }
+
+
+/* Apariencia: modo día y modo noche */
+html{color-scheme:dark}
+html[data-theme="light"]{
+  color-scheme:light;
+  --bg:#f4f5f8;
+  --panel:#ffffff;
+  --panel2:#eef0f4;
+  --line:#dfe2e8;
+  --text:#20222b;
+  --muted:#686c78;
+  --green:#16845b;
+  --red:#d53b4a;
+  --yellow:#9a6b00;
+  --blue:#176fb8;
+}
+html[data-theme="light"] body{background:var(--bg)}
+html[data-theme="light"] .sidebar{background:#ffffff;box-shadow:8px 0 28px rgba(32,34,43,.035)}
+html[data-theme="light"] .topbar{background:rgba(244,245,248,.9)}
+html[data-theme="light"] .nav-item:hover,
+html[data-theme="light"] .nav-item.active{color:var(--text);background:#eef0f4}
+html[data-theme="light"] .country-switch button.active{background:#ffffff;color:var(--text);box-shadow:0 1px 5px rgba(32,34,43,.12)}
+html[data-theme="light"] .metric,
+html[data-theme="light"] .panel{background:linear-gradient(145deg,#ffffff,#fafbfc);box-shadow:0 8px 24px rgba(32,34,43,.045)}
+html[data-theme="light"] .balance-flow-item{background:linear-gradient(145deg,color-mix(in srgb,var(--accent) 9%,#fff),color-mix(in srgb,var(--accent) 4%,#fff));box-shadow:0 10px 25px rgba(32,34,43,.06)}
+html[data-theme="light"] .input,
+html[data-theme="light"] .select,
+html[data-theme="light"] textarea{background:#fff;color:var(--text)}
+html[data-theme="light"] .tx-icon{background:#f0f1f4}
+html[data-theme="light"] .row-actions button:hover{color:var(--text)}
+html[data-theme="light"] .progress{background:#e6e8ed}
+html[data-theme="light"] .chart-filter-status strong{background:rgba(255,255,255,.68)}
+html[data-theme="light"] .category-legend>button small,
+html[data-theme="light"] .labeled-bar .bar-value,
+html[data-theme="light"] .labeled-bar small,
+html[data-theme="light"] body[data-country="CO"] .labeled-bar .bar-value,
+html[data-theme="light"] body[data-country="CO"] .labeled-bar small{color:var(--muted)}
+html[data-theme="light"] .daily-axis-label{fill:#747985}
+html[data-theme="light"] .daily-balance-dot{fill:#fff}
+html[data-theme="light"] .modal-backdrop{background:rgba(28,31,40,.38)}
+html[data-theme="light"] .modal-card,
+html[data-theme="light"] .confirm-card{background:#fff}
+html[data-theme="light"] body[data-country="CO"] .button.ghost:hover{border-color:#9a7915;background:#fff8d8;color:#3d3108}
+.theme-selector{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}
+.theme-selector button{min-height:92px;padding:15px;border:1px solid var(--line);border-radius:14px;background:var(--panel2);color:var(--text);font:inherit;text-align:left;cursor:pointer;display:grid;grid-template-columns:32px 1fr;grid-template-rows:auto auto;column-gap:10px;align-items:center;transition:border-color .18s,background .18s,transform .18s}
+.theme-selector button:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--purple) 55%,var(--line))}
+.theme-selector button.active{border-color:var(--purple);background:color-mix(in srgb,var(--purple) 13%,var(--panel));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--purple) 35%,transparent)}
+.theme-selector button>span{grid-row:1/3;width:32px;height:32px;border-radius:10px;background:var(--panel);display:grid;place-items:center;font-size:18px}
+.theme-selector button strong{font-size:13px}
+.theme-selector button small{color:var(--muted);font-size:11px}
+@media(max-width:520px){.theme-selector{grid-template-columns:1fr}}
