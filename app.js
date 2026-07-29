@@ -349,7 +349,7 @@ function bindPage(){
       donutTooltip.classList.add("show");donutTooltip.setAttribute("aria-hidden","false");
     };
     const hideDonutTooltip=()=>{donutTooltip.classList.remove("show");donutTooltip.setAttribute("aria-hidden","true")};
-    $(".donut-segment",donutWrap).forEach(segment=>{
+    $$(".donut-segment",donutWrap).forEach(segment=>{
       segment.onpointerenter=e=>showDonutTooltip(segment,e.clientX-donutWrap.getBoundingClientRect().left,e.clientY-donutWrap.getBoundingClientRect().top);
       segment.onpointermove=e=>showDonutTooltip(segment,e.clientX-donutWrap.getBoundingClientRect().left,e.clientY-donutWrap.getBoundingClientRect().top);
       segment.onpointerleave=hideDonutTooltip;
