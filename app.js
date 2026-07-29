@@ -210,9 +210,7 @@ function renderDashboard(){
   const groups=expenseGroups(categoryTx), selectedGroups=expenseGroups(tx), categoryTotal=totals(categoryTx).expense, flexible=selectedGroups.filter(([c])=>isFlexibleCategory(c)).reduce((a,[,v])=>a+v,0);
   const largest=tx.filter(x=>x.type==="gasto").sort((a,b)=>Number(b.amount)-Number(a.amount)).slice(0,5);
   const monthNames=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-  const activeFilters=dashboardMonth!=="all"||dashboardCategory?`<div class="chart-filter-status" aria-live="polite"><div><span>Vista filtrada</span>${dashboardMonth!=="all"?`<strong>${monthNames[Number(dashboardMonth)-1]} ${dashboardYear}</strong>`:""}${dashboardCategory?`<strong>${escapeHtml(dashboardCategory)}</strong>`:""}</div><button class="button ghost" data-clear-chart-filters>Limpiar filtros</button></div>`:`<div class="chart-filter-hint">Puedes hacer clic en un mes o una categoría para filtrar las demás visuales.</div>`;
   return `${pageHead("¿En qué se está yendo tu dinero?",`Análisis de ${periodLabel()} en ${meta[state.country].name}.`)}
-  ${activeFilters}
   ${balance?balanceReconciliation(balance):`<div class="balance-note"><span>Balance acumulado de movimientos clasificados</span><strong>${money(allTime.balance)}</strong><small>Entradas menos gastos de ${meta[state.country].name}; no representa un saldo bancario conciliado.</small></div>`}
   <div class="analysis-grid">
     <div class="panel category-panel"><div class="panel-head"><div><h3>Participación por categoría</h3><small>Qué categorías concentran el gasto</small></div></div>${categoryParticipation(groups,categoryTotal)}</div>
