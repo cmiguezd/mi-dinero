@@ -56,6 +56,19 @@ function isCarryForwardTransaction(x){
   const text=`${x.category||""} ${x.description||""}`;
   return /(mes anterior|saldo inicial|nuevo mes|saldo trasladado)/i.test(text);
 }
+function transactionCashChange(x){
+  const amount=Number(x.amount)||0;
+  if(["ingreso","cobro"].includes(x.type))return Math.abs(amount);
+  if(x.type==="gasto")return -Math.abs(amount);
+  if(x.type!=="ajuste"||isCarryForwardTransaction(x))return 0;
+  const explicit=[x.cashEffect,x.balanceEffect,x.saldoEffect,x.signedAmount,x.cashFlow]
+    .map(Number).find(Number.isFinite);
+  if(explicit!==undefined)return explicit;
+  const direction=String(x.cashDirection||x.balanceDirection||x.flowDirection||x.direction||"").toLowerCase();
+  if(/^(out|salida|egreso|debit|decrease|negative|-1)$/.test(direction))return -Math.abs(amount);
+  if(/^(in|entrada|ingreso|credit|increase|positive|1)$/.test(direction))return Math.abs(amount);
+  return amount;
+}
 function shiftedMonth(year,month,delta=0){
   const date=new Date(Date.UTC(Number(year),Number(month)-1+delta,1));
   const label=date.toLocaleString("es",{month:"long",timeZone:"UTC"});
@@ -72,14 +85,25 @@ function openingBalanceForMonth(year,month){
     .sort((a,b)=>a.date.localeCompare(b.date));
   return rows.length?Number(rows[0].amount)||0:null;
 }
-function monthlyBalanceReconciliation(t){
+function monthlyBalanceReconciliation(){
   if(dashboardMonth==="all")return null;
   const opening=openingBalanceForMonth(dashboardYear,dashboardMonth);
+  const periodTx=dashboardTransactions({ignoreCategory:true});
+  const periodTotals=totals(periodTx);
+  const directFlow=periodTotals.income-periodTotals.expense;
+  const adjustmentFlow=periodTx.reduce((sum,x)=>sum+(x.type==="ajuste"?transactionCashChange(x):0),0);
+  const ym=`${dashboardYear}-${dashboardMonth}`;
+  const transferFlow=state.transfers.reduce((sum,x)=>{
+    if(x.from===state.country&&x.date?.startsWith(ym))sum-=(Number(x.sent)||0)+(Number(x.fee)||0);
+    const receivedDate=x.arrivalDate||x.date;
+    if(x.to===state.country&&receivedDate?.startsWith(ym))sum+=Number(x.received)||0;
+    return sum;
+  },0);
   const next=shiftedMonth(dashboardYear,dashboardMonth,1);
   const recordedClosing=openingBalanceForMonth(next.year,next.month);
-  const directFlow=t.income-t.expense;
-  const closing=recordedClosing!==null?recordedClosing:(opening!==null?opening+directFlow:null);
-  const other=opening!==null&&recordedClosing!==null?recordedClosing-opening-directFlow:null;
+  const calculatedOther=adjustmentFlow+transferFlow;
+  const closing=recordedClosing!==null?recordedClosing:(opening!==null?opening+directFlow+calculatedOther:null);
+  const other=opening!==null&&recordedClosing!==null?recordedClosing-opening-directFlow:calculatedOther;
   return {opening,closing,other,directFlow,verified:recordedClosing!==null,nextLabel:next.label};
 }
 function signedMoney(value){
@@ -190,8 +214,7 @@ function dailyBalanceChart(){
     if(!x.date?.startsWith(ym)||isCarryForwardTransaction(x))return;
     const day=Number(x.date.slice(8,10));
     if(day<1||day>maxDay)return;
-    if(["ingreso","cobro"].includes(x.type))changes[day]+=Number(x.amount)||0;
-    if(x.type==="gasto")changes[day]-=Number(x.amount)||0;
+    changes[day]+=transactionCashChange(x);
   });
   state.transfers.forEach(x=>{
     if(x.from===state.country&&x.date?.startsWith(ym)){
