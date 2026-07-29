@@ -1,5 +1,6 @@
 const STORAGE_KEY = "mi-dinero-v3";
 const PERIOD_KEY = "mi-dinero-global-period";
+const THEME_KEY = "mi-dinero-theme";
 const blankState = () => ({
   version: 3, country: "CN",
   transactions: [], budgets: [], transfers: [], loans: [], recurrings: [],
@@ -7,6 +8,7 @@ const blankState = () => ({
 });
 let state = loadState();
 let currentPage = "resumen";
+let colorTheme = localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark";
 let pendingDelete = null;
 const savedPeriod = (()=>{try{return JSON.parse(localStorage.getItem(PERIOD_KEY)||"{}")}catch{return {}}})();
 let dashboardYear = savedPeriod.year||"";
@@ -34,6 +36,14 @@ function availableCategories(){const imported=countryItems(state.transactions).m
 function pageHead(title,description,action=""){return `<div class="page-head"><div><h2>${title}</h2><p>${description}</p></div>${action}</div>`}
 function empty(title,text){return `<div class="empty"><div><strong>${title}</strong>${text}</div></div>`}
 function savePeriod(){localStorage.setItem(PERIOD_KEY,JSON.stringify({year:dashboardYear,month:dashboardMonth}))}
+function applyTheme(theme=colorTheme){
+  colorTheme=theme==="light"?"light":"dark";
+  document.documentElement.dataset.theme=colorTheme;
+  document.documentElement.style.colorScheme=colorTheme;
+  const themeColor=document.querySelector('meta[name="theme-color"]');
+  if(themeColor)themeColor.content=colorTheme==="light"?"#f4f5f8":"#101117";
+}
+applyTheme();
 
 function periodOptions(){
   const tx=countryItems(state.transactions).filter(x=>x.date);
@@ -161,6 +171,7 @@ function isFlexibleCategory(category=""){
   return /(restaur|comida|aliment|mercado|compra|entreten|ocio|viaje|belleza|hormiga|transporte|delivery|ropa|regalo|suscrip)/i.test(category);
 }
 function render(){
+  applyTheme();
   document.body.dataset.country=state.country;
   $("#pageTitle").textContent=pageNames[currentPage];
   $$(".nav-item").forEach(x=>x.classList.toggle("active",x.dataset.page===currentPage));
@@ -324,8 +335,8 @@ function renderRecurrings(){
   return `${pageHead("Pagos recurrentes",`Recordatorios de gastos e ingresos periódicos.`,`<button class="button" data-add="recurring">+ Nuevo recurrente</button>`)}
   <div class="panel table-panel">${items.length?`<div class="transaction-list">${items.map(x=>`<div class="transaction-row"><div class="tx-icon">↻</div><div><strong>${escapeHtml(x.description)}</strong><small>${escapeHtml(x.frequency)} · Próximo: día ${x.day}</small></div><span class="amount ${x.type}">${money(x.amount)}</span><div class="row-actions"><button data-edit="recurring" data-id="${x.id}">✎</button><button data-delete="recurring" data-id="${x.id}">⌫</button></div></div>`).join("")}</div>`:empty("Sin pagos recurrentes","Agrega recordatorios; no crean transacciones automáticamente.")}</div>`;
 }
-function renderSettings(){const cloud=window.MiDineroCloud,connected=cloud?.isConnected(),status=window.miDineroCloudStatus?.text||"Falta configurar Google OAuth";return `${pageHead("Configuración","Administra la sincronización y las copias de seguridad.")}
-  <div class="settings-grid"><div class="panel"><h3>Cuenta</h3><div class="settings-row"><span>Nombre</span><strong>${escapeHtml(state.settings.user)}</strong></div><div class="settings-row"><span>Almacenamiento</span><strong>${connected?"Google Sheets + dispositivo":"Este dispositivo"}</strong></div><div class="cloud-status" id="cloudStatus">${escapeHtml(status)}</div><div class="form-actions" style="justify-content:flex-start">${connected?`<button class="button" id="syncNow">Sincronizar ahora</button><button class="button ghost" id="disconnectGoogle">Desconectar</button>`:`<button class="button" id="connectGoogle">Conectar Google Sheets</button>`}</div></div>
+function renderSettings(){const cloud=window.MiDineroCloud,connected=cloud?.isConnected(),status=window.miDineroCloudStatus?.text||"Falta configurar Google OAuth";return `${pageHead("Configuración","Administra la apariencia, sincronización y copias de seguridad.")}
+  <div class="settings-grid"><div class="panel appearance-panel"><h3>Apariencia</h3><p class="muted">Elige cómo quieres ver la aplicación en este dispositivo.</p><div class="theme-selector" role="group" aria-label="Modo de apariencia"><button type="button" data-theme-option="light" class="${colorTheme==="light"?"active":""}" aria-pressed="${colorTheme==="light"}"><span aria-hidden="true">☀</span><strong>Modo día</strong><small>Fondo claro</small></button><button type="button" data-theme-option="dark" class="${colorTheme==="dark"?"active":""}" aria-pressed="${colorTheme==="dark"}"><span aria-hidden="true">☾</span><strong>Modo noche</strong><small>Fondo oscuro</small></button></div></div><div class="panel"><h3>Cuenta</h3><div class="settings-row"><span>Nombre</span><strong>${escapeHtml(state.settings.user)}</strong></div><div class="settings-row"><span>Almacenamiento</span><strong>${connected?"Google Sheets + dispositivo":"Este dispositivo"}</strong></div><div class="cloud-status" id="cloudStatus">${escapeHtml(status)}</div><div class="form-actions" style="justify-content:flex-start">${connected?`<button class="button" id="syncNow">Sincronizar ahora</button><button class="button ghost" id="disconnectGoogle">Desconectar</button>`:`<button class="button" id="connectGoogle">Conectar Google Sheets</button>`}</div></div>
   <div class="panel"><h3>Configuración privada</h3><p class="muted">Estos valores quedan solamente en este navegador; no se publican en GitHub.</p><div class="field"><label>Google OAuth Client ID</label><input class="input" id="googleClientId" value="${escapeAttr(window.MI_DINERO_CLOUD_CONFIG?.clientId||"")}" placeholder="...apps.googleusercontent.com"></div><div class="field" style="margin-top:12px"><label>ID del Google Sheet</label><input class="input" id="googleSheetId" value="${escapeAttr(window.MI_DINERO_CLOUD_CONFIG?.spreadsheetId||"")}" placeholder="Identificador del archivo maestro"></div><div class="form-actions"><button class="button" id="saveCloudConfig">Guardar configuración</button></div></div>
   <div class="panel"><h3>Respaldos</h3><p class="muted">Descarga un respaldo completo o importa uno anterior.</p><div class="form-actions" style="justify-content:flex-start"><button class="button" id="exportData">Exportar respaldo</button><label class="button ghost" for="importData">Importar respaldo</label><input class="file-input" type="file" id="importData" accept=".json"></div><div class="settings-row"><span>Reiniciar aplicación</span><button class="button danger" id="resetData">Borrar datos locales</button></div></div></div>`}
 
@@ -359,6 +370,7 @@ function bindPage(){
   }
   const clearChartFilters=$("[data-clear-chart-filters]");if(clearChartFilters)clearChartFilters.onclick=()=>{dashboardCategory="";render()};
   const clearPeriod=$("[data-clear-period]");if(clearPeriod)clearPeriod.onclick=()=>{dashboardYear=periodOptions()[0]||String(new Date().getFullYear());dashboardMonth="all";dashboardCategory="";savePeriod();render()};
+  $("[data-theme-option]").forEach(button=>button.onclick=()=>{localStorage.setItem(THEME_KEY,button.dataset.themeOption);applyTheme(button.dataset.themeOption);render();toast(button.dataset.themeOption==="light"?"Modo día activado":"Modo noche activado")});
   if($("#exportData"))$("#exportData").onclick=exportData;if($("#importData"))$("#importData").onchange=importData;if($("#resetData"))$("#resetData").onclick=()=>askDelete("all","all");
   if($("#connectGoogle"))$("#connectGoogle").onclick=()=>window.MiDineroCloud?.connect();if($("#disconnectGoogle"))$("#disconnectGoogle").onclick=()=>window.MiDineroCloud?.disconnect();if($("#syncNow"))$("#syncNow").onclick=()=>window.MiDineroCloud?.pull();if($("#saveCloudConfig"))$("#saveCloudConfig").onclick=saveCloudConfig;
 }
