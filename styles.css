@@ -621,14 +621,16 @@ html[data-theme="light"] body[data-country="CO"] .button.ghost:hover{border-colo
 @media(max-width:520px){.theme-selector{grid-template-columns:1fr}}
 
 
-/* Tooltip y contraste del gráfico de gasto por periodo */
-.labeled-bar::after{
-  content:attr(data-bar-tooltip);
+/* Tooltip dinámico del gráfico de gasto por periodo */
+.labeled-bars{
+  position:relative;
+}
+.bar-tooltip{
   position:absolute;
-  left:50%;
-  top:4px;
-  z-index:6;
-  max-width:220px;
+  left:0;
+  top:0;
+  z-index:12;
+  max-width:min(260px,calc(100% - 16px));
   padding:8px 10px;
   border:1px solid color-mix(in srgb,var(--accent) 58%,#4b4d59);
   border-radius:9px;
@@ -638,14 +640,22 @@ html[data-theme="light"] body[data-country="CO"] .button.ghost:hover{border-colo
   font:700 11px/1.25 "DM Sans",sans-serif;
   white-space:nowrap;
   opacity:0;
+  visibility:hidden;
   pointer-events:none;
-  transform:translate(-50%,-100%) translateY(5px);
-  transition:opacity .16s,transform .16s;
+  transform:translate(-50%,-100%) translateY(-2px);
+  transition:opacity .12s,transform .12s,visibility 0s linear .12s;
 }
-.labeled-bar:hover::after,
-.labeled-bar:focus-visible::after{
+.bar-tooltip.show{
   opacity:1;
-  transform:translate(-50%,-100%) translateY(0);
+  visibility:visible;
+  transform:translate(-50%,-100%) translateY(-6px);
+  transition-delay:0s;
+}
+.bar-tooltip.is-below{
+  transform:translate(-50%,0) translateY(2px);
+}
+.bar-tooltip.is-below.show{
+  transform:translate(-50%,0) translateY(6px);
 }
 .labeled-bar:focus-visible{
   outline:2px solid color-mix(in srgb,var(--accent) 70%,transparent);
