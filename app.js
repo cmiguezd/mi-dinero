@@ -198,7 +198,7 @@ function merchantGroups(tx=dashboardTransactions({ignoreMerchant:true})){
   });
   return [...map.values()]
     .sort((a,b)=>b.count-a.count||b.amount-a.amount||a.label.localeCompare(b.label,"es"))
-    .slice(0,10)
+    .slice(0,5)
     .sort((a,b)=>b.amount-a.amount||b.count-a.count||a.label.localeCompare(b.label,"es"));
 }
 function isFlexibleCategory(category=""){
@@ -230,7 +230,7 @@ function renderDashboard(){
   <div class="analysis-grid analysis-grid-three">
     <div class="panel category-panel"><div class="panel-head"><div><h3>Participación por categoría</h3><small>Qué categorías concentran el gasto</small></div></div>${categoryParticipation(groups,categoryTotal)}</div>
     <div class="panel timeline-panel"><div class="panel-head"><div><h3>${dashboardMonth==="all"?"Gasto por mes":"Gasto por semana"}</h3><small>Valores del periodo seleccionado</small></div></div>${spendingTimeline(timelineTx)}</div>
-    <div class="panel category-panel merchant-panel"><div class="panel-head"><div><h3>Gasto por nombre</h3><small>Top 10 por frecuencia, ordenado por valor gastado</small></div></div>${merchantParticipation(merchants)}</div>
+    <div class="panel category-panel merchant-panel"><div class="panel-head"><div><h3>Gasto por nombre</h3><small>Top 5 por frecuencia, ordenado por valor gastado</small></div></div>${merchantParticipation(merchants)}</div>
   </div>
   <div class="analysis-grid lower">
     <div class="panel"><div class="panel-head"><div><h3>Gastos con margen de ajuste</h3><small>Restaurantes, compras, ocio y categorías similares</small></div></div>${flexibleBreakdown(selectedGroups,t.expense)}</div>
