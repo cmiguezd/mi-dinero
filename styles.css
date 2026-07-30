@@ -559,22 +559,31 @@ body[data-country="CO"] .labeled-bar .bar-value,body[data-country="CO"] .labeled
 
 /* Tooltip de comercio: resumen arriba y movimientos debajo. */
 .merchant-panel .donut-tooltip{
+  --tooltip-shift-x:0px;
   flex-direction:column;
-  align-items:flex-start;
+  align-items:center;
   gap:2px;
   width:max-content;
-  max-width:calc(100% - 12px);
+  max-width:var(--tooltip-max-width,none);
   white-space:nowrap;
+  text-align:center;
+  transform:translate(calc(-50% + var(--tooltip-shift-x)),calc(-100% - 12px)) translateY(4px);
+}
+.merchant-panel .donut-tooltip.show{
+  transform:translate(calc(-50% + var(--tooltip-shift-x)),calc(-100% - 12px)) translateY(0);
 }
 .merchant-panel .donut-tooltip strong{
-  max-width:none;
+  display:block;
+  max-width:100%;
   overflow:visible;
   text-overflow:clip;
+  text-align:center;
 }
 .merchant-panel .donut-tooltip span{
   display:block;
   width:100%;
   font-weight:600;
+  text-align:center;
 }
 
 /* Los tooltips oscuros conservan contraste propio en ambos temas. */
