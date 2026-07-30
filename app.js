@@ -656,7 +656,7 @@ function filterTransactions(){
   const type=$("#typeFilter")?.value||"";
   const category=$("#categoryFilter")?.value||"";
   let visible=0;
-  $(".transaction-row[data-transaction-id]",$("#txList")).forEach(row=>{
+  $("#txList")?.querySelectorAll(".transaction-row[data-transaction-id]").forEach(row=>{
     const matchesSearch=!q||(row.dataset.search||"").includes(q);
     const matchesType=!type||row.dataset.type===type;
     const matchesCategory=!category||row.dataset.category===category;
