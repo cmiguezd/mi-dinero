@@ -492,8 +492,13 @@ function renderLoanDetail(group){
     <div class="loan-detail-totals"><div><span>Deuda original</span><strong>${money(group.amount)}</strong></div><div><span>Abonos</span><strong>${money(group.paid)}</strong></div><div class="remaining"><span>Saldo restante</span><strong>${money(group.balance)}</strong></div></div>
     <div class="loan-detail-list">${operations.map(op=>`<article class="loan-history-row ${op.kind}"><span class="loan-history-dot" aria-hidden="true"></span><div class="loan-history-copy"><div><strong>${op.kind==="opening"?"Operación inicial":op.payment?.untracked?"Abonos anteriores":"Abono"}</strong><time>${op.date?dateLabel(op.date):"Sin fecha registrada"}</time></div><p>${op.kind==="opening"?(op.note?escapeHtml(op.note):"Préstamo registrado"):op.payment?.affectBalance?"Con movimiento en Transacciones":"Registro documental"}</p></div><div class="loan-history-values"><strong class="${op.kind==="payment"?"paid":""}">${op.kind==="payment"?"−":""}${money(op.amount)}</strong><small>Saldo: ${money(op.balance)}</small></div></article>`).join("")}</div>`;
 }
-function openLoanDetail(key){
-  const group=loanEntityGroups(countryItems(state.loans)).find(x=>x.key===key),modal=$("#loanDetailModal"),card=$("#loanDetailCard");if(!group||!modal||!card)return;
+function openLoanDetail(key,loanId=""){
+  let group=loanEntityGroups(countryItems(state.loans)).find(x=>x.key===key);
+  if(group&&loanId){
+    const loan=group.loans.find(x=>x.id===loanId);
+    if(loan)group=loanEntityGroups([loan])[0];
+  }
+  const modal=$("#loanDetailModal"),card=$("#loanDetailCard");if(!group||!modal||!card)return;
   card.innerHTML=renderLoanDetail(group);modal.classList.remove("hidden");document.body.classList.add("modal-open");$("[data-close-loan-detail]",modal)?.focus();
   const close=()=>{modal.classList.add("hidden");document.body.classList.remove("modal-open")};
   $("[data-close-loan-detail]",modal).onclick=close;modal.onclick=e=>{if(e.target===modal)close()};modal.onkeydown=e=>{if(e.key==="Escape")close()};
@@ -501,8 +506,9 @@ function openLoanDetail(key){
 function renderLoans(){
   const items=countryItems(state.loans),groups=loanEntityGroups(items);
   return `${pageHead("Préstamos",`Dinero que debemos y dinero que nos deben.`,`<button class="button" data-add="loan">+ Nuevo préstamo</button>`)}
-  ${groups.length?`<section class="loan-summary-section"><div class="loan-section-head"><div><h3>Resumen por persona o entidad</h3><p class="muted">Selecciona una tarjeta para ver la operación, los abonos y el saldo restante.</p></div></div><div class="loan-summary-grid">${groups.map(group=>`<button type="button" class="panel loan-summary-card" data-loan-summary="${escapeAttr(group.key)}"><div class="loan-summary-top"><div><small>${group.direction==="owed"?"DEBEMOS":"NOS DEBEN"}</small><h3>${escapeHtml(group.person)}</h3></div><span aria-hidden="true">›</span></div><strong class="loan-summary-balance">${money(group.balance)}</strong><span class="loan-summary-label">Saldo pendiente</span><div class="loan-summary-meta"><span>Original <b>${money(group.amount)}</b></span><span>Abonado <b>${money(group.paid)}</b></span></div><small>${group.loans.length} ${group.loans.length===1?"operación":"operaciones"}</small></button>`).join("")}</div></section>`:""}
-  <div class="loan-grid">${items.length?items.map(x=>`<article class="panel budget-card"><div class="budget-top"><div><small class="muted">${x.direction==="owed"?"DINERO QUE DEBEMOS":"DINERO QUE NOS DEBEN"}</small><h3>${escapeHtml(x.person)}</h3>${x.note?`<p class="loan-description">${escapeHtml(x.note)}</p>`:""}</div><div class="row-actions"><button data-edit="loan" data-id="${x.id}">✎</button><button data-delete="loan" data-id="${x.id}">⌫</button></div></div><div class="metric-value">${money(x.balance)}</div><small class="muted">De ${money(x.amount)} · ${dateLabel(x.date)}</small><div class="form-actions"><button class="button ghost" data-pay="${x.id}">Registrar abono</button></div></article>`).join(""):empty("Sin préstamos activos","Registra una obligación o cuenta por cobrar.")}</div>${loanDetailModal()}`;
+  ${groups.length?`<section class="loan-summary-section loan-summary-overview"><div class="loan-section-head"><div><span class="loan-section-kicker">VISTA GENERAL</span><h3>Resumen consolidado por persona o entidad</h3><p class="muted">Agrupa todas las deudas de una misma persona. Selecciona una tarjeta para ver su historial conjunto.</p></div></div><div class="loan-summary-grid">${groups.map(group=>`<button type="button" class="panel loan-summary-card" data-loan-summary="${escapeAttr(group.key)}"><div class="loan-summary-top"><div><small>${group.direction==="owed"?"DEBEMOS":"NOS DEBEN"}</small><h3>${escapeHtml(group.person)}</h3></div><span aria-hidden="true">›</span></div><strong class="loan-summary-balance">${money(group.balance)}</strong><span class="loan-summary-label">Saldo pendiente consolidado</span><div class="loan-summary-meta"><span>Original <b>${money(group.amount)}</b></span><span>Abonado <b>${money(group.paid)}</b></span></div><small>${group.loans.length} ${group.loans.length===1?"operación":"operaciones"} agrupadas</small></button>`).join("")}</div></section>`:""}
+  <section class="loan-individual-section"><div class="loan-section-head loan-individual-head"><div><span class="loan-section-kicker">DETALLE</span><h3>Préstamos individuales</h3><p class="muted">Cada tarjeta representa una deuda particular. Haz clic para consultar su operación y sus abonos.</p></div></div>
+  <div class="loan-grid">${items.length?items.map(x=>{const key=`${x.direction}::${String(x.person||"Sin nombre").trim().toLocaleLowerCase("es")}`;return `<article class="panel budget-card loan-item-card" role="button" tabindex="0" data-loan-detail="${x.id}" data-loan-key="${escapeAttr(key)}" aria-label="Ver historial de ${escapeAttr(x.person)}"><div class="budget-top"><div><small class="muted">${x.direction==="owed"?"DINERO QUE DEBEMOS":"DINERO QUE NOS DEBEN"}</small><h3>${escapeHtml(x.person)}</h3>${x.note?`<p class="loan-description">${escapeHtml(x.note)}</p>`:""}</div><div class="row-actions"><button data-edit="loan" data-id="${x.id}" aria-label="Editar préstamo">✎</button><button data-delete="loan" data-id="${x.id}" aria-label="Eliminar préstamo">⌫</button></div></div><div class="metric-value">${money(x.balance)}</div><small class="muted">De ${money(x.amount)} · ${dateLabel(x.date)}</small><div class="loan-card-footer"><span class="loan-history-link">Ver historial <b aria-hidden="true">›</b></span><button class="button ghost" data-pay="${x.id}">Registrar abono</button></div></article>`}).join(""):empty("Sin préstamos activos","Registra una obligación o cuenta por cobrar.")}</div></section>${loanDetailModal()}`;
 }
 function renderRecurrings(){
   const items=countryItems(state.recurrings);
@@ -536,7 +542,12 @@ function bindPage(){
   $$("[data-delete]").forEach(b=>b.onclick=()=>askDelete(b.dataset.delete,b.dataset.id));
   $$("[data-go]").forEach(b=>b.onclick=()=>{currentPage=b.dataset.go;render()});
   $$("[data-pay]").forEach(b=>b.onclick=()=>payLoan(b.dataset.pay));
-  $$("[data-loan-summary]").forEach(b=>b.onclick=()=>openLoanDetail(b.dataset.loanSummary));
+  $("[data-loan-summary]").forEach(b=>b.onclick=()=>openLoanDetail(b.dataset.loanSummary));
+  $("[data-loan-detail]").forEach(card=>{
+    const open=e=>{if(e.target.closest("button, a, input, select, textarea"))return;openLoanDetail(card.dataset.loanKey,card.dataset.loanDetail)};
+    card.onclick=open;
+    card.onkeydown=e=>{if((e.key==="Enter"||e.key===" ")&&!e.target.closest("button, a, input, select, textarea")){e.preventDefault();openLoanDetail(card.dataset.loanKey,card.dataset.loanDetail)}};
+  });
   $$("[data-recurring-check]").forEach(input=>input.onchange=()=>{
     setRecurringChecked(input.dataset.recurringCheck,input.checked);
     render();
