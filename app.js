@@ -535,8 +535,8 @@ function bindPage(){
   $$("[data-edit]").forEach(b=>b.onclick=()=>openForm(b.dataset.edit,b.dataset.id));
   $$("[data-delete]").forEach(b=>b.onclick=()=>askDelete(b.dataset.delete,b.dataset.id));
   $$("[data-go]").forEach(b=>b.onclick=()=>{currentPage=b.dataset.go;render()});
-  $("[data-pay]").forEach(b=>b.onclick=()=>payLoan(b.dataset.pay));
-  $("[data-loan-summary]").forEach(b=>b.onclick=()=>openLoanDetail(b.dataset.loanSummary));
+  $$("[data-pay]").forEach(b=>b.onclick=()=>payLoan(b.dataset.pay));
+  $$("[data-loan-summary]").forEach(b=>b.onclick=()=>openLoanDetail(b.dataset.loanSummary));
   $$("[data-recurring-check]").forEach(input=>input.onchange=()=>{
     setRecurringChecked(input.dataset.recurringCheck,input.checked);
     render();
