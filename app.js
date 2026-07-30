@@ -444,8 +444,21 @@ function bindPage(){
       donutTooltip.querySelector("strong").textContent=segment.dataset.tooltipTitle;
       donutTooltip.querySelector("span").textContent=segment.dataset.tooltipDetail;
       donutTooltip.style.setProperty("--tooltip-color",segment.dataset.tooltipColor);
+      donutTooltip.style.removeProperty("--tooltip-shift-x");
+      donutTooltip.style.removeProperty("--tooltip-max-width");
       donutTooltip.style.left=`${x}px`;donutTooltip.style.top=`${y}px`;
       donutTooltip.classList.add("show");donutTooltip.setAttribute("aria-hidden","false");
+      const merchantPanel=donutWrap.closest(".merchant-panel");
+      if(merchantPanel){
+        const panelRect=merchantPanel.getBoundingClientRect();
+        donutTooltip.style.setProperty("--tooltip-max-width",`${Math.max(180,panelRect.width-32)}px`);
+        const tipRect=donutTooltip.getBoundingClientRect();
+        const safeLeft=panelRect.left+12,safeRight=panelRect.right-12;
+        let shift=0;
+        if(tipRect.left<safeLeft)shift=safeLeft-tipRect.left;
+        else if(tipRect.right>safeRight)shift=safeRight-tipRect.right;
+        donutTooltip.style.setProperty("--tooltip-shift-x",`${shift}px`);
+      }
     };
     const hideDonutTooltip=()=>{donutTooltip.classList.remove("show");donutTooltip.setAttribute("aria-hidden","true")};
     $$(".donut-segment",donutWrap).forEach(segment=>{
