@@ -34,7 +34,51 @@ function dateLabel(date){if(!date)return "";return new Intl.DateTimeFormat("es",
 function today(){return new Date().toISOString().slice(0,10)}
 function toast(text){const el=$("#toast");el.textContent=text;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),2400)}
 function countryItems(arr){return arr.filter(x=>x.country===state.country)}
-function availableCategories(){const imported=countryItems(state.transactions).map(x=>x.category).filter(Boolean);return [...new Set([...imported,...fallbackCategories])].sort((a,b)=>a.localeCompare(b,"es"))}
+function categoryRegistry(){
+  if(!Array.isArray(state.categories)){
+    const saved=state.categories&&typeof state.categories==="object"
+      ?[...(state.categories.CN||[]),...(state.categories.CO||[])]
+      :[];
+    const imported=state.transactions.map(x=>x.category).filter(Boolean);
+    state.categories=[...new Set([...fallbackCategories,...saved,...imported])].sort((a,b)=>a.localeCompare(b,"es"));
+  }
+  return state.categories;
+}
+function availableCategories(){
+  const assigned=state.transactions.map(x=>x.category).filter(Boolean);
+  return [...new Set([...categoryRegistry(),...assigned])].sort((a,b)=>a.localeCompare(b,"es"));
+}
+function categoryUsage(name){return state.transactions.filter(x=>x.category===name).length}
+function addCategory(){
+  const input=$("#newCategoryName"),name=input?.value.trim().replace(/\s+/g," ");
+  if(!name){toast("Escribe el nombre de la categoría");return}
+  if(availableCategories().some(x=>x.localeCompare(name,"es",{sensitivity:"accent"})===0)){toast("La categoría ya existe");return}
+  categoryRegistry().push(name);categoryRegistry().sort((a,b)=>a.localeCompare(b,"es"));
+  saveState();render();toast("Categoría agregada para ambos países");
+}
+function renameCategory(oldName){
+  const entered=window.prompt("Nuevo nombre de la categoría:",oldName);
+  if(entered===null)return;
+  const name=entered.trim().replace(/\s+/g," ");
+  if(!name){toast("El nombre no puede quedar vacío");return}
+  if(name!==oldName&&availableCategories().some(x=>x.localeCompare(name,"es",{sensitivity:"accent"})===0)){toast("Ya existe una categoría con ese nombre");return}
+  state.categories=categoryRegistry().map(x=>x===oldName?name:x);
+  ["transactions","budgets","recurrings"].forEach(collection=>{
+    state[collection]=state[collection].map(x=>x.category===oldName?{...x,category:name,updatedAt:new Date().toISOString()}:x);
+  });
+  if(dashboardCategory===oldName)dashboardCategory=name;
+  saveState();render();toast("Categoría actualizada en ambos países");
+}
+function deleteCategory(name){
+  const usage=categoryUsage(name);
+  if(usage){
+    window.alert(`No se puede eliminar “${name}” porque tiene ${usage} transacción${usage===1?"":"es"} asignada${usage===1?"":"s"} entre China y Colombia. Primero reasigna esas transacciones a otra categoría.`);
+    return;
+  }
+  if(!window.confirm(`¿Eliminar la categoría compartida “${name}”?`))return;
+  state.categories=categoryRegistry().filter(x=>x!==name);
+  saveState();render();toast("Categoría eliminada");
+}
 function pageHead(title,description,action=""){return `<div class="page-head"><div><h2>${title}</h2><p>${description}</p></div>${action}</div>`}
 function empty(title,text){return `<div class="empty"><div><strong>${title}</strong>${text}</div></div>`}
 function savePeriod(){localStorage.setItem(PERIOD_KEY,JSON.stringify({year:dashboardYear,month:dashboardMonth}))}
@@ -410,7 +454,12 @@ function renderRecurrings(){
   return `${pageHead("Pagos recurrentes",`Recordatorios de gastos e ingresos periódicos.`,actions)}
   <div class="panel table-panel">${items.length?`<div class="recurring-check-summary"><span><strong>${checkedCount}</strong> de ${items.length} pagados</span><small>Marca cada recurrente cuando quede listo.</small></div><div class="transaction-list recurring-list">${items.map(x=>{const checked=isRecurringChecked(x.id);return `<div class="transaction-row recurring-row ${checked?"is-paid":""}" data-recurring-row="${x.id}"><label class="recurring-check" title="${checked?"Marcar como pendiente":"Marcar como pagado"}"><input type="checkbox" data-recurring-check="${x.id}" ${checked?"checked":""} aria-label="${checked?"Marcar como pendiente":"Marcar como pagado"}: ${escapeAttr(x.description)}"><span aria-hidden="true">✓</span></label><div class="tx-icon">↻</div><div><strong>${escapeHtml(x.description)}</strong><small>${escapeHtml(x.frequency)} · Próximo: día ${x.day}</small></div><span class="amount ${x.type}">${money(x.amount)}</span><div class="row-actions"><button data-edit="recurring" data-id="${x.id}">✎</button><button data-delete="recurring" data-id="${x.id}">⌫</button></div></div>`}).join("")}</div>`:empty("Sin pagos recurrentes","Agrega recordatorios; no crean transacciones automáticamente.")}</div>`;
 }
-function renderSettings(){const cloud=window.MiDineroCloud,connected=cloud?.isConnected(),status=window.miDineroCloudStatus?.text||"Falta configurar Google OAuth";return `${pageHead("Configuración","Administra la apariencia, sincronización y copias de seguridad.")}
+function renderSettings(){const cloud=window.MiDineroCloud,connected=cloud?.isConnected(),status=window.miDineroCloudStatus?.text||"Falta configurar Google OAuth";const categories=availableCategories();return `${pageHead("Configuración","Administra categorías, apariencia, sincronización y copias de seguridad.")}
+  <div class="panel category-manager-panel">
+    <div class="category-manager-head"><div><h3>Categorías compartidas</h3><p class="muted">Este catálogo se usa tanto en China como en Colombia.</p></div><div class="category-add"><input class="input" id="newCategoryName" maxlength="60" placeholder="Nueva categoría"><button type="button" class="button" id="addCategory">Agregar</button></div></div>
+    <div class="info-notice"><span aria-hidden="true">i</span><p><strong>Importante:</strong> no puedes eliminar una categoría si tiene transacciones asignadas en China o Colombia. Primero debes reasignarlas a otra categoría.</p></div>
+    <div class="category-manager-list">${categories.map(name=>{const usage=categoryUsage(name);return `<div class="category-manager-row"><div><strong>${escapeHtml(name)}</strong><small>${usage} transacción${usage===1?"":"es"}</small></div><div class="row-actions"><button type="button" data-category-rename="${escapeAttr(name)}" title="Renombrar categoría">✎</button><button type="button" data-category-delete="${escapeAttr(name)}" class="${usage?"is-disabled":""}" aria-disabled="${Boolean(usage)}" title="${usage?"No se puede eliminar: tiene transacciones asignadas":"Eliminar categoría"}">⌫</button></div></div>`}).join("")}</div>
+  </div>
   <div class="settings-grid"><div class="panel appearance-panel"><h3>Apariencia</h3><p class="muted">Elige cómo quieres ver la aplicación en este dispositivo.</p><div class="theme-selector" role="group" aria-label="Modo de apariencia"><button type="button" data-theme-option="light" class="${colorTheme==="light"?"active":""}" aria-pressed="${colorTheme==="light"}"><span aria-hidden="true">☀</span><strong>Modo día</strong><small>Fondo claro</small></button><button type="button" data-theme-option="dark" class="${colorTheme==="dark"?"active":""}" aria-pressed="${colorTheme==="dark"}"><span aria-hidden="true">☾</span><strong>Modo noche</strong><small>Fondo oscuro</small></button></div></div><div class="panel"><h3>Cuenta</h3><div class="settings-row"><span>Nombre</span><strong>${escapeHtml(state.settings.user)}</strong></div><div class="settings-row"><span>Almacenamiento</span><strong>${connected?"Google Sheets + dispositivo":"Este dispositivo"}</strong></div><div class="cloud-status" id="cloudStatus">${escapeHtml(status)}</div><div class="form-actions" style="justify-content:flex-start">${connected?`<button class="button" id="syncNow">Sincronizar ahora</button><button class="button ghost" id="disconnectGoogle">Desconectar</button>`:`<button class="button" id="connectGoogle">Conectar Google Sheets</button>`}</div></div>
   <div class="panel"><h3>Configuración privada</h3><p class="muted">Estos valores quedan solamente en este navegador; no se publican en GitHub.</p><div class="field"><label>Google OAuth Client ID</label><input class="input" id="googleClientId" value="${escapeAttr(window.MI_DINERO_CLOUD_CONFIG?.clientId||"")}" placeholder="...apps.googleusercontent.com"></div><div class="field" style="margin-top:12px"><label>ID del Google Sheet</label><input class="input" id="googleSheetId" value="${escapeAttr(window.MI_DINERO_CLOUD_CONFIG?.spreadsheetId||"")}" placeholder="Identificador del archivo maestro"></div><div class="form-actions"><button class="button" id="saveCloudConfig">Guardar configuración</button></div></div>
   <div class="panel"><h3>Respaldos</h3><p class="muted">Descarga un respaldo completo o importa uno anterior.</p><div class="form-actions" style="justify-content:flex-start"><button class="button" id="exportData">Exportar respaldo</button><label class="button ghost" for="importData">Importar respaldo</label><input class="file-input" type="file" id="importData" accept=".json"></div><div class="settings-row"><span>Reiniciar aplicación</span><button class="button danger" id="resetData">Borrar datos locales</button></div></div></div>`}
@@ -497,7 +546,11 @@ function bindPage(){
   }
   const clearChartFilters=$("[data-clear-chart-filters]");if(clearChartFilters)clearChartFilters.onclick=()=>{dashboardCategory="";render()};
   const clearPeriod=$("[data-clear-period]");if(clearPeriod)clearPeriod.onclick=()=>{dashboardYear=periodOptions()[0]||String(new Date().getFullYear());dashboardMonth="all";dashboardCategory="";savePeriod();render()};
-  $$("[data-theme-option]").forEach(button=>button.onclick=()=>{localStorage.setItem(THEME_KEY,button.dataset.themeOption);applyTheme(button.dataset.themeOption);render();toast(button.dataset.themeOption==="light"?"Modo día activado":"Modo noche activado")});
+  $("[data-theme-option]").forEach(button=>button.onclick=()=>{localStorage.setItem(THEME_KEY,button.dataset.themeOption);applyTheme(button.dataset.themeOption);render();toast(button.dataset.themeOption==="light"?"Modo día activado":"Modo noche activado")});
+  if($("#addCategory"))$("#addCategory").onclick=addCategory;
+  if($("#newCategoryName"))$("#newCategoryName").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();addCategory()}};
+  $("[data-category-rename]").forEach(button=>button.onclick=()=>renameCategory(button.dataset.categoryRename));
+  $("[data-category-delete]").forEach(button=>button.onclick=()=>deleteCategory(button.dataset.categoryDelete));
   if($("#exportData"))$("#exportData").onclick=exportData;if($("#importData"))$("#importData").onchange=importData;if($("#resetData"))$("#resetData").onclick=()=>askDelete("all","all");
   if($("#connectGoogle"))$("#connectGoogle").onclick=()=>window.MiDineroCloud?.connect();if($("#disconnectGoogle"))$("#disconnectGoogle").onclick=()=>window.MiDineroCloud?.disconnect();if($("#syncNow"))$("#syncNow").onclick=()=>window.MiDineroCloud?.pull();if($("#saveCloudConfig"))$("#saveCloudConfig").onclick=saveCloudConfig;
 }
