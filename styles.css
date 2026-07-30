@@ -970,6 +970,7 @@ body[data-country="CO"] .info-notice>span{color:#211b00}
 
 
 /* Filtro de préstamos saldados */
+.loan-page-actions>.button{min-height:39px}
 .loan-settled-filter{
   height:39px;
   box-sizing:border-box;
