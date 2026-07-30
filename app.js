@@ -562,8 +562,8 @@ function bindPage(){
   if(categoryManagerModal)categoryManagerModal.onclick=e=>{if(e.target===categoryManagerModal)closeCategoryManager()};
   if($("#addCategory"))$("#addCategory").onclick=addCategory;
   if($("#newCategoryName"))$("#newCategoryName").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();addCategory()}};
-  $("[data-category-rename]").forEach(button=>button.onclick=()=>renameCategory(button.dataset.categoryRename));
-  $("[data-category-delete]").forEach(button=>button.onclick=()=>deleteCategory(button.dataset.categoryDelete));
+  document.querySelectorAll("[data-category-rename]").forEach(button=>button.onclick=()=>renameCategory(button.dataset.categoryRename));
+  document.querySelectorAll("[data-category-delete]").forEach(button=>button.onclick=()=>deleteCategory(button.dataset.categoryDelete));
   if(categoryManagerModal)categoryManagerModal.onkeydown=e=>{if(e.key==="Escape")closeCategoryManager()};
   if($("#exportData"))$("#exportData").onclick=exportData;if($("#importData"))$("#importData").onchange=importData;if($("#resetData"))$("#resetData").onclick=()=>askDelete("all","all");
   if($("#connectGoogle"))$("#connectGoogle").onclick=()=>window.MiDineroCloud?.connect();if($("#disconnectGoogle"))$("#disconnectGoogle").onclick=()=>window.MiDineroCloud?.disconnect();if($("#syncNow"))$("#syncNow").onclick=()=>window.MiDineroCloud?.pull();if($("#saveCloudConfig"))$("#saveCloudConfig").onclick=saveCloudConfig;
