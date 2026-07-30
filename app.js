@@ -503,26 +503,31 @@ function bindPage(){
 }
 function filterTransactions(){const q=$("#searchTx").value.toLowerCase(),type=$("#typeFilter").value;$(".transaction-row",$("#txList")).forEach(r=>r.style.display=(!q||r.dataset.search.includes(q))&&(!type||r.dataset.type===type)?"grid":"none")}
 function exportVisibleTransactions(){
-  if(typeof XLSX==="undefined"){toast("No se pudo cargar el exportador de Excel");return}
-  const visibleIds=$(".transaction-row[data-transaction-id]",$("#txList")).filter(row=>row.style.display!=="none").map(row=>row.dataset.transactionId);
+  const visibleIds=$$(".transaction-row[data-transaction-id]",$("#txList")).filter(row=>row.style.display!=="none").map(row=>row.dataset.transactionId);
   const byId=new Map(state.transactions.map(x=>[String(x.id),x]));
   const rows=visibleIds.map(id=>byId.get(String(id))).filter(Boolean);
   if(!rows.length){toast("No hay transacciones visibles para exportar");return}
-  const data=rows.map(x=>({
-    Fecha:x.date||"",
-    Tipo:({gasto:"Gasto",ingreso:"Ingreso",cobro:"Cobro / reembolso",ajuste:"Ajuste"})[x.type]||x.type||"",
-    Descripción:x.description||"",
-    Categoría:x.category||"",
-    Monto:Number(x.amount)||0,
-    Moneda:meta[x.country||state.country].currency,
-    País:meta[x.country||state.country].name
-  }));
-  const sheet=XLSX.utils.json_to_sheet(data);
-  sheet["!cols"]=[{wch:12},{wch:20},{wch:36},{wch:24},{wch:16},{wch:10},{wch:12}];
-  const workbook=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook,sheet,"Transacciones");
+  const xmlEscape=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[char]));
+  const headers=["Fecha","Tipo","Descripción","Categoría","Monto","Moneda","País"];
+  const values=rows.map(x=>[
+    x.date||"",
+    ({gasto:"Gasto",ingreso:"Ingreso",cobro:"Cobro / reembolso",ajuste:"Ajuste"})[x.type]||x.type||"",
+    x.description||"",
+    x.category||"",
+    Number(x.amount)||0,
+    meta[x.country||state.country].currency,
+    meta[x.country||state.country].name
+  ]);
+  const cell=(value,isNumber=false)=>`<Cell><Data ss:Type="${isNumber?"Number":"String"}">${xmlEscape(value)}</Data></Cell>`;
+  const table=[headers,...values].map((row,rowIndex)=>`<Row>${row.map((value,columnIndex)=>cell(value,rowIndex>0&&columnIndex===4)).join("")}</Row>`).join("");
+  const workbook=`<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Transacciones"><Table>${table}</Table></Worksheet></Workbook>`;
+  const blob=new Blob([workbook],{type:"application/vnd.ms-excel;charset=utf-8"});
+  const link=document.createElement("a");
+  link.href=URL.createObjectURL(blob);
   const month=dashboardMonth==="all"?"todo-el-ano":dashboardMonth;
-  XLSX.writeFile(workbook,`transacciones-${state.country.toLowerCase()}-${dashboardYear}-${month}.xlsx`);
+  link.download=`transacciones-${state.country.toLowerCase()}-${dashboardYear}-${month}.xls`;
+  link.click();
+  setTimeout(()=>URL.revokeObjectURL(link.href),0);
   toast(`${rows.length} transacciones exportadas`);
 }
 function formField(label,name,type="text",value="",options=null,full=false){return `<div class="field ${full?"full":""}"><label>${label}</label>${options?`<select class="select" name="${name}" required>${options.map(o=>`<option value="${o.value}" ${String(o.value)===String(value)?"selected":""}>${o.label}</option>`).join("")}</select>`:`<input class="input" name="${name}" type="${type}" value="${escapeAttr(value)}" ${type==="number"?'min="0" step="0.01"':""} ${type==="date"?'title="Haz clic para elegir una fecha"':""} required>`}</div>`}
