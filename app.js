@@ -196,7 +196,7 @@ function merchantGroups(tx=dashboardTransactions({ignoreMerchant:true})){
     const key=merchantKey(label),current=map.get(key)||{key,label,count:0,amount:0};
     current.count+=1;current.amount+=Number(x.amount||0);map.set(key,current);
   });
-  return [...map.values()].sort((a,b)=>b.count-a.count||b.amount-a.amount||a.label.localeCompare(b.label,"es")).slice(0,10);
+  return [...map.values()].sort((a,b)=>b.amount-a.amount||b.count-a.count||a.label.localeCompare(b.label,"es")).slice(0,10);
 }
 function isFlexibleCategory(category=""){
   return /(restaur|comida|aliment|mercado|compra|entreten|ocio|viaje|belleza|hormiga|transporte|delivery|ropa|regalo|suscrip)/i.test(category);
@@ -224,11 +224,11 @@ function renderDashboard(){
   const monthNames=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
   return `${pageHead("¿En qué se está yendo tu dinero?",`Análisis de ${periodLabel()} en ${meta[state.country].name}.`)}
   ${balance?balanceReconciliation(balance):`<div class="balance-note"><span>Balance acumulado de movimientos clasificados</span><strong>${money(allTime.balance)}</strong><small>Entradas menos gastos de ${meta[state.country].name}; no representa un saldo bancario conciliado.</small></div>`}
-  <div class="analysis-grid">
+  <div class="analysis-grid analysis-grid-three">
     <div class="panel category-panel"><div class="panel-head"><div><h3>Participación por categoría</h3><small>Qué categorías concentran el gasto</small></div></div>${categoryParticipation(groups,categoryTotal)}</div>
-    <div class="panel"><div class="panel-head"><div><h3>${dashboardMonth==="all"?"Gasto por mes":"Gasto por semana"}</h3><small>Valores del periodo seleccionado</small></div></div>${spendingTimeline(timelineTx)}</div>
+    <div class="panel timeline-panel"><div class="panel-head"><div><h3>${dashboardMonth==="all"?"Gasto por mes":"Gasto por semana"}</h3><small>Valores del periodo seleccionado</small></div></div>${spendingTimeline(timelineTx)}</div>
+    <div class="panel category-panel merchant-panel"><div class="panel-head"><div><h3>Gasto por nombre</h3><small>Los 10 nombres con mayor valor gastado</small></div></div>${merchantParticipation(merchants)}</div>
   </div>
-  <div class="panel category-panel merchant-panel"><div class="panel-head"><div><h3>Gastos más frecuentes</h3><small>Los 10 nombres que más se repiten en el periodo seleccionado</small></div></div>${merchantParticipation(merchants)}</div>
   <div class="analysis-grid lower">
     <div class="panel"><div class="panel-head"><div><h3>Gastos con margen de ajuste</h3><small>Restaurantes, compras, ocio y categorías similares</small></div></div>${flexibleBreakdown(selectedGroups,t.expense)}</div>
     <div class="panel"><div class="panel-head"><h3>Mayores gastos individuales</h3><button class="button ghost" data-go="transacciones">Ver todos</button></div>${largest.length?transactionRows(largest):empty("Sin gastos","No hay salidas en este periodo.")}</div>
@@ -262,20 +262,21 @@ function categoryParticipation(groups,total){
 function merchantParticipation(groups){
   if(!groups.length)return empty("Sin gastos","No hay nombres de gastos para el periodo seleccionado.");
   const colors=["var(--accent)","#ff8a65","#8c7ae6","#36c5b4","#e6b94c","#67a8e4","#d36c9d","#8caa5b","#ef7aaf","#55b6c2"];
+  const totalAmount=groups.reduce((sum,x)=>sum+x.amount,0);
   const totalCount=groups.reduce((sum,x)=>sum+x.count,0);
   let cursor=0;
   const segments=groups.map((item,i)=>{
-    const percent=totalCount?item.count/totalCount*100:0,offset=-cursor;cursor+=percent;
+    const percent=totalAmount?item.amount/totalAmount*100:0,offset=-cursor;cursor+=percent;
     const selected=dashboardMerchant===item.key,dimmed=dashboardMerchant&&!selected;
-    const detail=`${item.count} movimiento${item.count===1?"":"s"} · ${Math.round(percent)}% · ${money(item.amount)}`;
+    const detail=`${Math.round(percent)}% · ${money(item.amount)} · ${item.count} movimiento${item.count===1?"":"s"}`;
     return `<circle class="donut-segment ${selected?"is-selected":""} ${dimmed?"is-dimmed":""}" cx="50" cy="50" r="40" pathLength="100" fill="none" stroke="${colors[i%colors.length]}" stroke-width="18" stroke-dasharray="${percent} ${100-percent}" stroke-dashoffset="${offset}" data-merchant-filter="${escapeAttr(item.key)}" data-tooltip-title="${escapeAttr(item.label)}" data-tooltip-detail="${escapeAttr(detail)}" data-tooltip-color="${colors[i%colors.length]}" tabindex="0" role="button" aria-label="${escapeAttr(item.label+" · "+detail)}"></circle>`;
   }).join("");
   const legend=groups.map((item,i)=>{
-    const percent=totalCount?Math.round(item.count/totalCount*100):0,selected=dashboardMerchant===item.key,dimmed=dashboardMerchant&&!selected;
-    const detail=`${item.count} movimiento${item.count===1?"":"s"} · ${money(item.amount)}`;
-    return `<button type="button" class="${selected?"is-selected":""} ${dimmed?"is-dimmed":""}" data-merchant-filter="${escapeAttr(item.key)}" title="${escapeAttr(item.label+" · "+detail)}"><i style="background:${colors[i%colors.length]}"></i><span>${escapeHtml(item.label)}</span><strong>${item.count}×</strong><small>${money(item.amount)}</small></button>`;
+    const percent=totalAmount?Math.round(item.amount/totalAmount*100):0,selected=dashboardMerchant===item.key,dimmed=dashboardMerchant&&!selected;
+    const detail=`${percent}% · ${money(item.amount)} · ${item.count} movimiento${item.count===1?"":"s"}`;
+    return `<button type="button" class="${selected?"is-selected":""} ${dimmed?"is-dimmed":""}" data-merchant-filter="${escapeAttr(item.key)}" title="${escapeAttr(item.label+" · "+detail)}"><i style="background:${colors[i%colors.length]}"></i><span>${escapeHtml(item.label)}</span><strong>${percent}%</strong><small>${money(item.amount)}</small></button>`;
   }).join("");
-  return `<div class="category-visual merchant-visual"><div class="donut-wrap"><svg class="donut-svg" viewBox="0 0 100 100" aria-label="Los diez gastos más frecuentes">${segments}</svg><div class="donut-center"><strong>${totalCount}</strong><span>Movimientos</span></div><div class="donut-tooltip" role="tooltip" aria-hidden="true"><strong></strong><span></span></div></div><div class="category-legend">${legend}</div></div>`;
+  return `<div class="category-visual merchant-visual"><div class="donut-wrap"><svg class="donut-svg" viewBox="0 0 100 100" aria-label="Los diez nombres con mayor gasto">${segments}</svg><div class="donut-center"><strong>${money(totalAmount)}</strong><span>${totalCount} movimientos</span></div><div class="donut-tooltip" role="tooltip" aria-hidden="true"><strong></strong><span></span></div></div><div class="category-legend">${legend}</div></div>`;
 }
 function spendingTimeline(tx){
   const expenses=tx.filter(x=>x.type==="gasto");
