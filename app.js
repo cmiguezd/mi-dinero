@@ -2,6 +2,7 @@ const STORAGE_KEY = "mi-dinero-v3";
 const PERIOD_KEY = "mi-dinero-global-period";
 const THEME_KEY = "mi-dinero-theme";
 const RECURRING_CHECKS_KEY = "mi-dinero-recurring-checks";
+const LOAN_SETTLED_FILTER_KEY = "mi-dinero-hide-settled-loans";
 const blankState = () => ({
   version: 3, country: "CN",
   transactions: [], budgets: [], transfers: [], loans: [], recurrings: [],
@@ -11,6 +12,7 @@ let state = loadState();
 let currentPage = "resumen";
 let colorTheme = localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark";
 let pendingDelete = null;
+let hideSettledLoans = localStorage.getItem(LOAN_SETTLED_FILTER_KEY) !== "false";
 const savedPeriod = (()=>{try{return JSON.parse(localStorage.getItem(PERIOD_KEY)||"{}")}catch{return {}}})();
 let dashboardYear = savedPeriod.year||"";
 let dashboardMonth = savedPeriod.month||"all";
@@ -504,11 +506,12 @@ function openLoanDetail(key,loanId=""){
   $("[data-close-loan-detail]",modal).onclick=close;modal.onclick=e=>{if(e.target===modal)close()};modal.onkeydown=e=>{if(e.key==="Escape")close()};
 }
 function renderLoans(){
-  const items=countryItems(state.loans),groups=loanEntityGroups(items);
-  return `${pageHead("Préstamos",`Dinero que debemos y dinero que nos deben.`,`<button class="button" data-add="loan">+ Nuevo préstamo</button>`)}
+  const allItems=countryItems(state.loans),items=hideSettledLoans?allItems.filter(x=>Number(x.balance)>0):allItems,groups=loanEntityGroups(items);
+  const actions=`<div class="page-head-actions loan-page-actions"><label class="loan-settled-filter" title="Oculta las deudas cuyo saldo pendiente es cero"><input type="checkbox" data-hide-settled-loans ${hideSettledLoans?"checked":""}><span class="loan-filter-check" aria-hidden="true">✓</span><span>Ocultar saldados</span></label><button class="button" data-add="loan">+ Nuevo préstamo</button></div>`;
+  return `${pageHead("Préstamos",`Dinero que debemos y dinero que nos deben.`,actions)}
   ${groups.length?`<section class="loan-summary-section loan-summary-overview"><div class="loan-section-head"><div><span class="loan-section-kicker">VISTA GENERAL</span><h3>Resumen consolidado por persona o entidad</h3><p class="muted">Agrupa todas las deudas de una misma persona. Selecciona una tarjeta para ver su historial conjunto.</p></div></div><div class="loan-summary-grid">${groups.map(group=>`<button type="button" class="panel loan-summary-card" data-loan-summary="${escapeAttr(group.key)}"><div class="loan-summary-top"><div><small>${group.direction==="owed"?"DEBEMOS":"NOS DEBEN"}</small><h3>${escapeHtml(group.person)}</h3></div><span aria-hidden="true">›</span></div><strong class="loan-summary-balance">${money(group.balance)}</strong><span class="loan-summary-label">Saldo pendiente consolidado</span><div class="loan-summary-meta"><span>Original <b>${money(group.amount)}</b></span><span>Abonado <b>${money(group.paid)}</b></span></div><small>${group.loans.length} ${group.loans.length===1?"operación":"operaciones"} agrupadas</small></button>`).join("")}</div></section>`:""}
   <section class="loan-individual-section"><div class="loan-section-head loan-individual-head"><div><span class="loan-section-kicker">DETALLE</span><h3>Préstamos individuales</h3><p class="muted">Cada tarjeta representa una deuda particular. Haz clic para consultar su operación y sus abonos.</p></div></div>
-  <div class="loan-grid">${items.length?items.map(x=>{const key=`${x.direction}::${String(x.person||"Sin nombre").trim().toLocaleLowerCase("es")}`;return `<article class="panel budget-card loan-item-card" role="button" tabindex="0" data-loan-detail="${x.id}" data-loan-key="${escapeAttr(key)}" aria-label="Ver historial de ${escapeAttr(x.person)}"><div class="budget-top"><div><small class="muted">${x.direction==="owed"?"DINERO QUE DEBEMOS":"DINERO QUE NOS DEBEN"}</small><h3>${escapeHtml(x.person)}</h3>${x.note?`<p class="loan-description">${escapeHtml(x.note)}</p>`:""}</div><div class="row-actions"><button data-edit="loan" data-id="${x.id}" aria-label="Editar préstamo">✎</button><button data-delete="loan" data-id="${x.id}" aria-label="Eliminar préstamo">⌫</button></div></div><div class="metric-value">${money(x.balance)}</div><small class="muted">De ${money(x.amount)} · ${dateLabel(x.date)}</small><div class="loan-card-footer"><span class="loan-history-link">Ver historial <b aria-hidden="true">›</b></span><button class="button ghost" data-pay="${x.id}">Registrar abono</button></div></article>`}).join(""):empty("Sin préstamos activos","Registra una obligación o cuenta por cobrar.")}</div></section>${loanDetailModal()}`;
+  <div class="loan-grid">${items.length?items.map(x=>{const key=`${x.direction}::${String(x.person||"Sin nombre").trim().toLocaleLowerCase("es")}`;return `<article class="panel budget-card loan-item-card" role="button" tabindex="0" data-loan-detail="${x.id}" data-loan-key="${escapeAttr(key)}" aria-label="Ver historial de ${escapeAttr(x.person)}"><div class="budget-top"><div><small class="muted">${x.direction==="owed"?"DINERO QUE DEBEMOS":"DINERO QUE NOS DEBEN"}</small><h3>${escapeHtml(x.person)}</h3>${x.note?`<p class="loan-description">${escapeHtml(x.note)}</p>`:""}</div><div class="row-actions"><button data-edit="loan" data-id="${x.id}" aria-label="Editar préstamo">✎</button><button data-delete="loan" data-id="${x.id}" aria-label="Eliminar préstamo">⌫</button></div></div><div class="metric-value">${money(x.balance)}</div><small class="muted">De ${money(x.amount)} · ${dateLabel(x.date)}</small><div class="loan-card-footer"><span class="loan-history-link">Ver historial <b aria-hidden="true">›</b></span><button class="button ghost" data-pay="${x.id}">Registrar abono</button></div></article>`}).join(""):empty(hideSettledLoans&&allItems.length?"No hay préstamos pendientes":"Sin préstamos registrados",hideSettledLoans&&allItems.length?"Desactiva “Ocultar saldados” para consultar el historial completo.":"Registra una obligación o cuenta por cobrar.")}</div></section>${loanDetailModal()}`;
 }
 function renderRecurrings(){
   const items=countryItems(state.recurrings);
@@ -541,7 +544,8 @@ function bindPage(){
   $$("[data-edit]").forEach(b=>b.onclick=()=>openForm(b.dataset.edit,b.dataset.id));
   $$("[data-delete]").forEach(b=>b.onclick=()=>askDelete(b.dataset.delete,b.dataset.id));
   $$("[data-go]").forEach(b=>b.onclick=()=>{currentPage=b.dataset.go;render()});
-  $$("[data-pay]").forEach(b=>b.onclick=()=>payLoan(b.dataset.pay));
+  $("[data-pay]").forEach(b=>b.onclick=()=>payLoan(b.dataset.pay));
+  const settledFilter=$("[data-hide-settled-loans]");if(settledFilter)settledFilter.onchange=()=>{hideSettledLoans=settledFilter.checked;localStorage.setItem(LOAN_SETTLED_FILTER_KEY,String(hideSettledLoans));render()};
   document.querySelectorAll("[data-loan-summary]").forEach(b=>b.onclick=()=>openLoanDetail(b.dataset.loanSummary));
   document.querySelectorAll("[data-loan-detail]").forEach(card=>{
     const open=e=>{if(e.target.closest("button, a, input, select, textarea"))return;openLoanDetail(card.dataset.loanKey,card.dataset.loanDetail)};
