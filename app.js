@@ -542,8 +542,8 @@ function bindPage(){
   $$("[data-delete]").forEach(b=>b.onclick=()=>askDelete(b.dataset.delete,b.dataset.id));
   $$("[data-go]").forEach(b=>b.onclick=()=>{currentPage=b.dataset.go;render()});
   $$("[data-pay]").forEach(b=>b.onclick=()=>payLoan(b.dataset.pay));
-  $("[data-loan-summary]").forEach(b=>b.onclick=()=>openLoanDetail(b.dataset.loanSummary));
-  $("[data-loan-detail]").forEach(card=>{
+  document.querySelectorAll("[data-loan-summary]").forEach(b=>b.onclick=()=>openLoanDetail(b.dataset.loanSummary));
+  document.querySelectorAll("[data-loan-detail]").forEach(card=>{
     const open=e=>{if(e.target.closest("button, a, input, select, textarea"))return;openLoanDetail(card.dataset.loanKey,card.dataset.loanDetail)};
     card.onclick=open;
     card.onkeydown=e=>{if((e.key==="Enter"||e.key===" ")&&!e.target.closest("button, a, input, select, textarea")){e.preventDefault();openLoanDetail(card.dataset.loanKey,card.dataset.loanDetail)}};
