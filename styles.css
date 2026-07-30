@@ -967,3 +967,55 @@ body[data-country="CO"] .info-notice>span{color:#211b00}
 .loan-history-link{display:inline-flex;align-items:center;gap:6px;color:var(--accent);font-size:11px;font-weight:800}
 .loan-history-link b{font-size:18px;line-height:1}
 @media(max-width:620px){.loan-summary-overview{padding:14px}.loan-card-footer{align-items:stretch;flex-direction:column}.loan-card-footer .button{width:100%}}
+
+
+/* Filtro de préstamos saldados */
+.loan-settled-filter{
+  height:39px;
+  box-sizing:border-box;
+  display:inline-flex;
+  align-items:center;
+  gap:9px;
+  padding:0 13px;
+  border:1px solid var(--line);
+  border-radius:11px;
+  background:var(--panel2);
+  color:var(--text);
+  font-size:12px;
+  font-weight:700;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.loan-settled-filter input{
+  position:absolute;
+  width:1px;
+  height:1px;
+  opacity:0;
+  pointer-events:none;
+}
+.loan-filter-check{
+  width:18px;
+  height:18px;
+  display:grid;
+  place-items:center;
+  flex:0 0 18px;
+  border:1px solid var(--line);
+  border-radius:6px;
+  background:var(--panel);
+  color:transparent;
+  font-size:11px;
+  transition:background .18s,border-color .18s,color .18s;
+}
+.loan-settled-filter input:checked + .loan-filter-check{
+  background:var(--purple);
+  border-color:var(--purple);
+  color:#16121e;
+}
+.loan-settled-filter:has(input:focus-visible){
+  outline:2px solid color-mix(in srgb,var(--accent) 70%,transparent);
+  outline-offset:2px;
+}
+@media(max-width:620px){
+  .loan-page-actions{width:100%;display:grid;grid-template-columns:1fr 1fr}
+  .loan-settled-filter,.loan-page-actions .button{width:100%;justify-content:center}
+}
