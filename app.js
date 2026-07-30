@@ -549,8 +549,8 @@ function bindPage(){
   $("[data-theme-option]").forEach(button=>button.onclick=()=>{localStorage.setItem(THEME_KEY,button.dataset.themeOption);applyTheme(button.dataset.themeOption);render();toast(button.dataset.themeOption==="light"?"Modo día activado":"Modo noche activado")});
   if($("#addCategory"))$("#addCategory").onclick=addCategory;
   if($("#newCategoryName"))$("#newCategoryName").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();addCategory()}};
-  $("[data-category-rename]").forEach(button=>button.onclick=()=>renameCategory(button.dataset.categoryRename));
-  $("[data-category-delete]").forEach(button=>button.onclick=()=>deleteCategory(button.dataset.categoryDelete));
+  $$("[data-category-rename]").forEach(button=>button.onclick=()=>renameCategory(button.dataset.categoryRename));
+  $$("[data-category-delete]").forEach(button=>button.onclick=()=>deleteCategory(button.dataset.categoryDelete));
   if($("#exportData"))$("#exportData").onclick=exportData;if($("#importData"))$("#importData").onchange=importData;if($("#resetData"))$("#resetData").onclick=()=>askDelete("all","all");
   if($("#connectGoogle"))$("#connectGoogle").onclick=()=>window.MiDineroCloud?.connect();if($("#disconnectGoogle"))$("#disconnectGoogle").onclick=()=>window.MiDineroCloud?.disconnect();if($("#syncNow"))$("#syncNow").onclick=()=>window.MiDineroCloud?.pull();if($("#saveCloudConfig"))$("#saveCloudConfig").onclick=saveCloudConfig;
 }
