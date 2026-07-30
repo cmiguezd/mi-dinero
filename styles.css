@@ -1026,3 +1026,32 @@ body[data-country="CO"] .info-notice>span{color:#211b00}
 .loan-overview-totals{display:grid;grid-template-columns:repeat(2,minmax(145px,1fr));gap:10px;margin-left:auto}.loan-overview-totals>div,.recurring-total-cards>div{padding:11px 13px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}.loan-overview-totals span,.recurring-total-cards span{display:block;color:var(--muted);font-size:10px;font-weight:700;letter-spacing:.04em}.loan-overview-totals strong,.recurring-total-cards strong{display:block;margin-top:4px;font-size:16px;white-space:nowrap}.loan-overview-totals>div:first-child strong{color:var(--red)}.loan-overview-totals>div:last-child strong{color:var(--green)}.loan-overview-empty{padding:18px;border:1px dashed var(--line);border-radius:14px;text-align:center;color:var(--muted)}.loan-overview-empty span,.loan-overview-empty small{display:block}.loan-overview-empty span{color:var(--text);font-weight:700;margin-bottom:4px}.recurring-total-cards{display:grid;grid-template-columns:repeat(2,minmax(170px,220px));gap:10px;justify-content:end;margin:-8px 0 14px}.recurring-total-cards .pending{border-color:color-mix(in srgb,var(--yellow) 35%,var(--line))}.recurring-total-cards .pending strong{color:var(--yellow)}
 @media(max-width:760px){.loan-section-head{align-items:stretch;flex-direction:column;gap:12px}.loan-overview-totals{width:100%;margin-left:0}.recurring-total-cards{grid-template-columns:1fr 1fr;justify-content:stretch}}
 @media(max-width:430px){.loan-overview-totals,.recurring-total-cards{grid-template-columns:1fr}.loan-overview-totals strong,.recurring-total-cards strong{white-space:normal}}
+
+
+/* Alineación de resúmenes y tonos semánticos de préstamos */
+.recurring-page-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:nowrap}
+.recurring-page-actions .recurring-total-cards{display:grid;grid-template-columns:repeat(2,minmax(150px,190px));gap:10px;margin:0}
+.recurring-page-actions .recurring-total-cards>div{display:flex;min-height:50px;box-sizing:border-box;flex-direction:column;justify-content:center;padding:8px 12px}
+.recurring-page-actions .recurring-total-cards strong{font-size:15px}
+.recurring-action-buttons{display:flex;align-items:center;gap:8px}
+.recurring-action-buttons .button{min-height:39px;white-space:nowrap}
+
+.loan-summary-card.loan-tone-owed,.loan-item-card.loan-tone-owed{border-color:color-mix(in srgb,var(--red) 32%,var(--line))}
+.loan-summary-card.loan-tone-receivable,.loan-item-card.loan-tone-receivable{border-color:color-mix(in srgb,var(--green) 32%,var(--line))}
+.loan-tone-owed .loan-summary-top small,.loan-tone-owed .budget-top small,.loan-tone-owed .loan-summary-balance,.loan-tone-owed>.metric-value{color:var(--red)}
+.loan-tone-receivable .loan-summary-top small,.loan-tone-receivable .budget-top small,.loan-tone-receivable .loan-summary-balance,.loan-tone-receivable>.metric-value{color:var(--green)}
+.loan-summary-card.loan-tone-owed:hover,.loan-summary-card.loan-tone-owed:focus-visible,.loan-item-card.loan-tone-owed:hover,.loan-item-card.loan-tone-owed:focus-visible{border-color:color-mix(in srgb,var(--red) 65%,var(--line))}
+.loan-summary-card.loan-tone-receivable:hover,.loan-summary-card.loan-tone-receivable:focus-visible,.loan-item-card.loan-tone-receivable:hover,.loan-item-card.loan-tone-receivable:focus-visible{border-color:color-mix(in srgb,var(--green) 65%,var(--line))}
+
+@media(max-width:1180px){
+  .recurring-page-actions{align-items:stretch;flex-direction:column}
+  .recurring-page-actions .recurring-total-cards{width:100%;grid-template-columns:1fr 1fr}
+  .recurring-action-buttons{justify-content:flex-end}
+}
+@media(max-width:620px){
+  .recurring-action-buttons{display:grid;grid-template-columns:1fr 1fr}
+  .recurring-action-buttons .button{width:100%;justify-content:center}
+}
+@media(max-width:430px){
+  .recurring-page-actions .recurring-total-cards,.recurring-action-buttons{grid-template-columns:1fr}
+}
