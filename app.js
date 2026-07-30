@@ -344,7 +344,7 @@ function flexibleBreakdown(groups,total){
   return `<div class="rank-list">${items.map(([c,v],i)=>`<div class="rank-item"><span class="rank-number">${i+1}</span><div><div class="rank-label"><strong>${escapeHtml(c)}</strong><span>${money(v)} · ${total?Math.round(v/total*100):0}%</span></div><div class="rank-track"><i style="width:${v/max*100}%"></i></div></div></div>`).join("")}</div>`;
 }
 function renderTransactions(){
-  const tx=dashboardTransactions({ignoreCategory:true}).sort((a,b)=>b.date.localeCompare(a.date));
+  const tx=dashboardTransactions({ignoreCategory:true}).sort((a,b)=>b.date.localeCompare(a.date)||Number(b.amount||0)-Number(a.amount||0));
   return `${pageHead("Todos tus movimientos",`${tx.length} registros de ${periodLabel()} en ${meta[state.country].name}.`,`<button class="button" data-add="transaction">+ Nueva transacción</button>`)}
   <div class="filters"><input class="input" id="searchTx" placeholder="Buscar por descripción o categoría"><select class="select" id="typeFilter"><option value="">Todos los tipos</option><option value="gasto">Gastos</option><option value="ingreso">Ingresos</option><option value="cobro">Cobros</option><option value="ajuste">Ajustes</option></select></div>
   <div class="panel table-panel" id="txList">${tx.length?transactionRows(tx):empty("Aún no hay transacciones","Registra un gasto, ingreso, cobro o ajuste.")}</div>`;
