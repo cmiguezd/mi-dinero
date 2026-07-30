@@ -34,25 +34,27 @@ function dateLabel(date){if(!date)return "";return new Intl.DateTimeFormat("es",
 function today(){return new Date().toISOString().slice(0,10)}
 function toast(text){const el=$("#toast");el.textContent=text;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),2400)}
 function countryItems(arr){return arr.filter(x=>x.country===state.country)}
-function categoryRegistry(country=state.country){
-  state.categories=state.categories&&typeof state.categories==="object"?state.categories:{};
-  if(!Array.isArray(state.categories[country])){
-    const imported=state.transactions.filter(x=>x.country===country).map(x=>x.category).filter(Boolean);
-    state.categories[country]=[...new Set([...fallbackCategories,...imported])].sort((a,b)=>a.localeCompare(b,"es"));
+function categoryRegistry(){
+  if(!Array.isArray(state.categories)){
+    const saved=state.categories&&typeof state.categories==="object"
+      ?[...(state.categories.CN||[]),...(state.categories.CO||[])]
+      :[];
+    const imported=state.transactions.map(x=>x.category).filter(Boolean);
+    state.categories=[...new Set([...fallbackCategories,...saved,...imported])].sort((a,b)=>a.localeCompare(b,"es"));
   }
-  return state.categories[country];
+  return state.categories;
 }
 function availableCategories(){
-  const assigned=countryItems(state.transactions).map(x=>x.category).filter(Boolean);
+  const assigned=state.transactions.map(x=>x.category).filter(Boolean);
   return [...new Set([...categoryRegistry(),...assigned])].sort((a,b)=>a.localeCompare(b,"es"));
 }
-function categoryUsage(name){return countryItems(state.transactions).filter(x=>x.category===name).length}
+function categoryUsage(name){return state.transactions.filter(x=>x.category===name).length}
 function addCategory(){
   const input=$("#newCategoryName"),name=input?.value.trim().replace(/\s+/g," ");
   if(!name){toast("Escribe el nombre de la categoría");return}
   if(availableCategories().some(x=>x.localeCompare(name,"es",{sensitivity:"accent"})===0)){toast("La categoría ya existe");return}
   categoryRegistry().push(name);categoryRegistry().sort((a,b)=>a.localeCompare(b,"es"));
-  saveState();render();toast("Categoría agregada");
+  saveState();render();toast("Categoría agregada para ambos países");
 }
 function renameCategory(oldName){
   const entered=window.prompt("Nuevo nombre de la categoría:",oldName);
@@ -60,21 +62,21 @@ function renameCategory(oldName){
   const name=entered.trim().replace(/\s+/g," ");
   if(!name){toast("El nombre no puede quedar vacío");return}
   if(name!==oldName&&availableCategories().some(x=>x.localeCompare(name,"es",{sensitivity:"accent"})===0)){toast("Ya existe una categoría con ese nombre");return}
-  state.categories[state.country]=categoryRegistry().map(x=>x===oldName?name:x);
+  state.categories=categoryRegistry().map(x=>x===oldName?name:x);
   ["transactions","budgets","recurrings"].forEach(collection=>{
-    state[collection]=state[collection].map(x=>x.country===state.country&&x.category===oldName?{...x,category:name,updatedAt:new Date().toISOString()}:x);
+    state[collection]=state[collection].map(x=>x.category===oldName?{...x,category:name,updatedAt:new Date().toISOString()}:x);
   });
   if(dashboardCategory===oldName)dashboardCategory=name;
-  saveState();render();toast("Categoría actualizada");
+  saveState();render();toast("Categoría actualizada en ambos países");
 }
 function deleteCategory(name){
   const usage=categoryUsage(name);
   if(usage){
-    window.alert(`No se puede eliminar “${name}” porque tiene ${usage} transacción${usage===1?"":"es"} asignada${usage===1?"":"s"}. Primero reasigna esas transacciones a otra categoría.`);
+    window.alert(`No se puede eliminar “${name}” porque tiene ${usage} transacción${usage===1?"":"es"} asignada${usage===1?"":"s"} entre China y Colombia. Primero reasigna esas transacciones a otra categoría.`);
     return;
   }
-  if(!window.confirm(`¿Eliminar la categoría “${name}” de ${meta[state.country].name}?`))return;
-  state.categories[state.country]=categoryRegistry().filter(x=>x!==name);
+  if(!window.confirm(`¿Eliminar la categoría compartida “${name}”?`))return;
+  state.categories=categoryRegistry().filter(x=>x!==name);
   saveState();render();toast("Categoría eliminada");
 }
 function pageHead(title,description,action=""){return `<div class="page-head"><div><h2>${title}</h2><p>${description}</p></div>${action}</div>`}
@@ -454,8 +456,8 @@ function renderRecurrings(){
 }
 function renderSettings(){const cloud=window.MiDineroCloud,connected=cloud?.isConnected(),status=window.miDineroCloudStatus?.text||"Falta configurar Google OAuth";const categories=availableCategories();return `${pageHead("Configuración","Administra categorías, apariencia, sincronización y copias de seguridad.")}
   <div class="panel category-manager-panel">
-    <div class="category-manager-head"><div><h3>Categorías de ${meta[state.country].name}</h3><p class="muted">Crea y organiza las categorías disponibles para este país.</p></div><div class="category-add"><input class="input" id="newCategoryName" maxlength="60" placeholder="Nueva categoría"><button type="button" class="button" id="addCategory">Agregar</button></div></div>
-    <div class="info-notice"><span aria-hidden="true">i</span><p><strong>Importante:</strong> no puedes eliminar categorías que tengan transacciones asignadas. Primero debes reasignar esas transacciones a otra categoría.</p></div>
+    <div class="category-manager-head"><div><h3>Categorías compartidas</h3><p class="muted">Este catálogo se usa tanto en China como en Colombia.</p></div><div class="category-add"><input class="input" id="newCategoryName" maxlength="60" placeholder="Nueva categoría"><button type="button" class="button" id="addCategory">Agregar</button></div></div>
+    <div class="info-notice"><span aria-hidden="true">i</span><p><strong>Importante:</strong> no puedes eliminar una categoría si tiene transacciones asignadas en China o Colombia. Primero debes reasignarlas a otra categoría.</p></div>
     <div class="category-manager-list">${categories.map(name=>{const usage=categoryUsage(name);return `<div class="category-manager-row"><div><strong>${escapeHtml(name)}</strong><small>${usage} transacción${usage===1?"":"es"}</small></div><div class="row-actions"><button type="button" data-category-rename="${escapeAttr(name)}" title="Renombrar categoría">✎</button><button type="button" data-category-delete="${escapeAttr(name)}" class="${usage?"is-disabled":""}" aria-disabled="${Boolean(usage)}" title="${usage?"No se puede eliminar: tiene transacciones asignadas":"Eliminar categoría"}">⌫</button></div></div>`}).join("")}</div>
   </div>
   <div class="settings-grid"><div class="panel appearance-panel"><h3>Apariencia</h3><p class="muted">Elige cómo quieres ver la aplicación en este dispositivo.</p><div class="theme-selector" role="group" aria-label="Modo de apariencia"><button type="button" data-theme-option="light" class="${colorTheme==="light"?"active":""}" aria-pressed="${colorTheme==="light"}"><span aria-hidden="true">☀</span><strong>Modo día</strong><small>Fondo claro</small></button><button type="button" data-theme-option="dark" class="${colorTheme==="dark"?"active":""}" aria-pressed="${colorTheme==="dark"}"><span aria-hidden="true">☾</span><strong>Modo noche</strong><small>Fondo oscuro</small></button></div></div><div class="panel"><h3>Cuenta</h3><div class="settings-row"><span>Nombre</span><strong>${escapeHtml(state.settings.user)}</strong></div><div class="settings-row"><span>Almacenamiento</span><strong>${connected?"Google Sheets + dispositivo":"Este dispositivo"}</strong></div><div class="cloud-status" id="cloudStatus">${escapeHtml(status)}</div><div class="form-actions" style="justify-content:flex-start">${connected?`<button class="button" id="syncNow">Sincronizar ahora</button><button class="button ghost" id="disconnectGoogle">Desconectar</button>`:`<button class="button" id="connectGoogle">Conectar Google Sheets</button>`}</div></div>
