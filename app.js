@@ -225,7 +225,7 @@ function renderDashboard(){
   const groups=expenseGroups(categoryTx), selectedGroups=expenseGroups(tx), merchants=merchantGroups(dashboardTransactions({ignoreMerchant:true})), categoryTotal=totals(categoryTx).expense, flexible=selectedGroups.filter(([c])=>isFlexibleCategory(c)).reduce((a,[,v])=>a+v,0);
   const largest=tx.filter(x=>x.type==="gasto").sort((a,b)=>Number(b.amount)-Number(a.amount)).slice(0,5);
   const monthNames=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-  return `${pageHead("¿En qué se está yendo tu dinero?",`Análisis de ${periodLabel()} en ${meta[state.country].name}.`)}
+  return `${pageHead("¿En qué se está yendo tu dinero?",`Análisis de ${periodLabel()} en ${meta[state.country].name}.`,`<button class="button" data-add="transaction">+ Nueva transacción</button>`)}
   ${balance?balanceReconciliation(balance):`<div class="balance-note"><span>Balance acumulado de movimientos clasificados</span><strong>${money(allTime.balance)}</strong><small>Entradas menos gastos de ${meta[state.country].name}; no representa un saldo bancario conciliado.</small></div>`}
   <div class="analysis-grid analysis-grid-three">
     <div class="panel category-panel"><div class="panel-head"><div><h3>Participación por categoría</h3><small>Qué categorías concentran el gasto</small></div></div>${categoryParticipation(groups,categoryTotal)}</div>
@@ -380,11 +380,12 @@ function flexibleBreakdown(groups,total){
 }
 function renderTransactions(){
   const tx=dashboardTransactions({ignoreCategory:true}).sort((a,b)=>b.date.localeCompare(a.date)||Number(b.amount||0)-Number(a.amount||0));
-  return `${pageHead("Todos tus movimientos",`${tx.length} registros de ${periodLabel()} en ${meta[state.country].name}.`,`<button class="button" data-add="transaction">+ Nueva transacción</button>`)}
+  const actions=`<div class="page-head-actions"><button class="button ghost" type="button" id="exportTransactions">↓ Exportar Excel</button><button class="button" data-add="transaction">+ Nueva transacción</button></div>`;
+  return `${pageHead("Todos tus movimientos",`${tx.length} registros de ${periodLabel()} en ${meta[state.country].name}.`,actions)}
   <div class="filters"><input class="input" id="searchTx" placeholder="Buscar por descripción o categoría"><select class="select" id="typeFilter"><option value="">Todos los tipos</option><option value="gasto">Gastos</option><option value="ingreso">Ingresos</option><option value="cobro">Cobros</option><option value="ajuste">Ajustes</option></select></div>
   <div class="panel table-panel" id="txList">${tx.length?transactionRows(tx):empty("Aún no hay transacciones","Registra un gasto, ingreso, cobro o ajuste.")}</div>`;
 }
-function transactionRows(tx){return `<div class="transaction-list">${tx.map(x=>`<div class="transaction-row" data-search="${(x.description+" "+x.category+" "+x.type).toLowerCase()}" data-type="${x.type}"><div class="tx-icon">${x.type==="gasto"?"↓":"↑"}</div><div><strong>${escapeHtml(x.description)}</strong><small>${escapeHtml(x.category)} · ${dateLabel(x.date)}</small></div><span class="amount ${x.type}">${x.type==="gasto"?"−":"+"}${money(x.amount,x.country)}</span><div class="row-actions"><button data-edit="transaction" data-id="${x.id}" title="Editar">✎</button><button data-delete="transaction" data-id="${x.id}" title="Eliminar">⌫</button></div></div>`).join("")}</div>`}
+function transactionRows(tx){return `<div class="transaction-list">${tx.map(x=>`<div class="transaction-row" data-transaction-id="${x.id}" data-search="${(x.description+" "+x.category+" "+x.type).toLowerCase()}" data-type="${x.type}"><div class="tx-icon">${x.type==="gasto"?"↓":"↑"}</div><div><strong>${escapeHtml(x.description)}</strong><small>${escapeHtml(x.category)} · ${dateLabel(x.date)}</small></div><span class="amount ${x.type}">${x.type==="gasto"?"−":"+"}${money(x.amount,x.country)}</span><div class="row-actions"><button data-edit="transaction" data-id="${x.id}" title="Editar">✎</button><button data-delete="transaction" data-id="${x.id}" title="Eliminar">⌫</button></div></div>`).join("")}</div>`}
 function spentByCategory(category){return dashboardTransactions({ignoreCategory:true}).filter(x=>x.type==="gasto"&&x.category===category).reduce((a,b)=>a+Number(b.amount),0)}
 function renderBudgets(){
   const items=countryItems(state.budgets);
@@ -433,7 +434,7 @@ function bindPage(){
       clearRecurringChecks();render();toast("Checks reiniciados");
     }
   };
-  const search=$("#searchTx"),filter=$("#typeFilter");if(search)search.oninput=filterTransactions;if(filter)filter.onchange=filterTransactions;
+  const search=$("#searchTx"),filter=$("#typeFilter");if(search)search.oninput=filterTransactions;if(filter)filter.onchange=filterTransactions;const exportTransactionsButton=$("#exportTransactions");if(exportTransactionsButton)exportTransactionsButton.onclick=exportVisibleTransactions;
   const year=$("#globalYear"),month=$("#globalMonth");if(year)year.onchange=()=>{dashboardYear=year.value;dashboardCategory="";dashboardMerchant="";savePeriod();render()};if(month)month.onchange=()=>{dashboardMonth=month.value;dashboardCategory="";dashboardMerchant="";savePeriod();render()};
   $$("[data-month-filter]").forEach(b=>b.onclick=()=>{dashboardMonth=dashboardMonth===b.dataset.monthFilter?"all":b.dataset.monthFilter;savePeriod();render()});
   $$("[data-category-filter]").forEach(b=>{b.onclick=()=>{dashboardCategory=dashboardCategory===b.dataset.categoryFilter?"":b.dataset.categoryFilter;render()};b.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();b.click()}}});
@@ -500,7 +501,30 @@ function bindPage(){
   if($("#exportData"))$("#exportData").onclick=exportData;if($("#importData"))$("#importData").onchange=importData;if($("#resetData"))$("#resetData").onclick=()=>askDelete("all","all");
   if($("#connectGoogle"))$("#connectGoogle").onclick=()=>window.MiDineroCloud?.connect();if($("#disconnectGoogle"))$("#disconnectGoogle").onclick=()=>window.MiDineroCloud?.disconnect();if($("#syncNow"))$("#syncNow").onclick=()=>window.MiDineroCloud?.pull();if($("#saveCloudConfig"))$("#saveCloudConfig").onclick=saveCloudConfig;
 }
-function filterTransactions(){const q=$("#searchTx").value.toLowerCase(),type=$("#typeFilter").value;$$(".transaction-row",$("#txList")).forEach(r=>r.style.display=(!q||r.dataset.search.includes(q))&&(!type||r.dataset.type===type)?"grid":"none")}
+function filterTransactions(){const q=$("#searchTx").value.toLowerCase(),type=$("#typeFilter").value;$(".transaction-row",$("#txList")).forEach(r=>r.style.display=(!q||r.dataset.search.includes(q))&&(!type||r.dataset.type===type)?"grid":"none")}
+function exportVisibleTransactions(){
+  if(typeof XLSX==="undefined"){toast("No se pudo cargar el exportador de Excel");return}
+  const visibleIds=$(".transaction-row[data-transaction-id]",$("#txList")).filter(row=>row.style.display!=="none").map(row=>row.dataset.transactionId);
+  const byId=new Map(state.transactions.map(x=>[String(x.id),x]));
+  const rows=visibleIds.map(id=>byId.get(String(id))).filter(Boolean);
+  if(!rows.length){toast("No hay transacciones visibles para exportar");return}
+  const data=rows.map(x=>({
+    Fecha:x.date||"",
+    Tipo:({gasto:"Gasto",ingreso:"Ingreso",cobro:"Cobro / reembolso",ajuste:"Ajuste"})[x.type]||x.type||"",
+    Descripción:x.description||"",
+    Categoría:x.category||"",
+    Monto:Number(x.amount)||0,
+    Moneda:meta[x.country||state.country].currency,
+    País:meta[x.country||state.country].name
+  }));
+  const sheet=XLSX.utils.json_to_sheet(data);
+  sheet["!cols"]=[{wch:12},{wch:20},{wch:36},{wch:24},{wch:16},{wch:10},{wch:12}];
+  const workbook=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook,sheet,"Transacciones");
+  const month=dashboardMonth==="all"?"todo-el-ano":dashboardMonth;
+  XLSX.writeFile(workbook,`transacciones-${state.country.toLowerCase()}-${dashboardYear}-${month}.xlsx`);
+  toast(`${rows.length} transacciones exportadas`);
+}
 function formField(label,name,type="text",value="",options=null,full=false){return `<div class="field ${full?"full":""}"><label>${label}</label>${options?`<select class="select" name="${name}" required>${options.map(o=>`<option value="${o.value}" ${String(o.value)===String(value)?"selected":""}>${o.label}</option>`).join("")}</select>`:`<input class="input" name="${name}" type="${type}" value="${escapeAttr(value)}" ${type==="number"?'min="0" step="0.01"':""} ${type==="date"?'title="Haz clic para elegir una fecha"':""} required>`}</div>`}
 function bindDatePickers(root){
   $$('input[type="date"]',root).forEach(input=>{
