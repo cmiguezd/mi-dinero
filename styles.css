@@ -562,11 +562,14 @@ body[data-country="CO"] .labeled-bar .bar-value,body[data-country="CO"] .labeled
   flex-direction:column;
   align-items:flex-start;
   gap:2px;
-  max-width:min(260px,calc(100% - 12px));
+  width:max-content;
+  max-width:calc(100% - 12px);
   white-space:nowrap;
 }
 .merchant-panel .donut-tooltip strong{
-  max-width:100%;
+  max-width:none;
+  overflow:visible;
+  text-overflow:clip;
 }
 .merchant-panel .donut-tooltip span{
   display:block;
