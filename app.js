@@ -81,7 +81,7 @@ function openCategoryActionDialog(mode,name){
       <form id="categoryRenameForm"><label>Nombre de la categoría<input class="input" id="categoryRenameInput" maxlength="60" value="${escapeAttr(name)}" autocomplete="off"></label><div class="form-actions"><button type="button" class="button ghost" data-category-action-close>Cancelar</button><button type="submit" class="button">Guardar cambios</button></div></form>`;
   }else if(usage){
     card.innerHTML=`<div class="modal-head"><div><p class="eyebrow">CATEGORÍA</p><h2>No se puede eliminar</h2></div><button type="button" class="icon-button" data-category-action-close aria-label="Cerrar">×</button></div>
-      <div class="category-action-message"><div class="danger-icon">!</div><p><strong>“${escapeHtml(name)}” tiene ${usage} transacción${usage===1?"":"es"} asignada${usage===1?"":"s"}.</strong><span>Primero debes reasignarlas a otra categoría en China o Colombia.</span></p></div>
+      <div class="category-action-message"><div class="danger-icon">!</div><p><strong>“${escapeHtml(name)}” tiene ${usage} ${usage===1?"transacción":"transacciones"} asignada${usage===1?"":"s"}.</strong><span>Primero debes reasignarlas a otra categoría en China o Colombia.</span></p></div>
       <div class="form-actions"><button type="button" class="button" data-category-action-close>Entendido</button></div>`;
   }else{
     card.innerHTML=`<div class="modal-head"><div><p class="eyebrow">CATEGORÍA</p><h2>Eliminar categoría</h2></div><button type="button" class="icon-button" data-category-action-close aria-label="Cerrar">×</button></div>
@@ -91,7 +91,7 @@ function openCategoryActionDialog(mode,name){
   modal.classList.remove("hidden");
   requestAnimationFrame(()=>{const input=$("#categoryRenameInput",card);if(input)input.select();else $("[data-category-action-close]",card)?.focus()});
   const close=()=>modal.classList.add("hidden");
-  $("[data-category-action-close]",card).forEach(button=>button.onclick=close);
+  card.querySelectorAll("[data-category-action-close]").forEach(button=>button.onclick=close);
   modal.onclick=e=>{if(e.target===modal)close()};
   modal.onkeydown=e=>{if(e.key==="Escape"){e.stopPropagation();close()}};
   const form=$("#categoryRenameForm",card);
@@ -483,7 +483,7 @@ function renderSettings(){const cloud=window.MiDineroCloud,connected=cloud?.isCo
     <div class="modal-card category-manager-modal">
       <div class="modal-head"><div><p class="eyebrow">CONFIGURACIÓN</p><h2 id="categoryManagerTitle">Editar categorías</h2></div><button type="button" class="icon-button" id="closeCategoryManager" aria-label="Cerrar">×</button></div>
       <div class="info-notice"><span aria-hidden="true">i</span><p><strong>Importante:</strong> no puedes eliminar una categoría si tiene transacciones asignadas en China o Colombia. Primero debes reasignarlas a otra categoría.</p></div>
-      <div class="category-manager-list">${categories.map(name=>{const usage=categoryUsage(name);return `<div class="category-manager-row"><div><strong>${escapeHtml(name)}</strong><small>${usage} transacción${usage===1?"":"es"}</small></div><div class="row-actions category-row-actions"><button type="button" data-category-rename="${escapeAttr(name)}" aria-label="Editar ${escapeAttr(name)}" title="Editar categoría">✎</button><button type="button" data-category-delete="${escapeAttr(name)}" class="${usage?"is-disabled":""}" aria-label="Eliminar ${escapeAttr(name)}" title="${usage?"Ver por qué no se puede eliminar":"Eliminar categoría"}">⌫</button></div></div>`}).join("")}</div>
+      <div class="category-manager-list">${categories.map(name=>{const usage=categoryUsage(name);return `<div class="category-manager-row"><div><strong>${escapeHtml(name)}</strong><small>${usage} ${usage===1?"transacción":"transacciones"}</small></div><div class="row-actions category-row-actions"><button type="button" data-category-rename="${escapeAttr(name)}" aria-label="Editar ${escapeAttr(name)}" title="Editar categoría">✎</button><button type="button" data-category-delete="${escapeAttr(name)}" class="${usage?"is-disabled":""}" aria-label="Eliminar ${escapeAttr(name)}" title="${usage?"Ver por qué no se puede eliminar":"Eliminar categoría"}">⌫</button></div></div>`}).join("")}</div>
       <div class="modal-backdrop hidden category-action-backdrop" id="categoryActionModal" role="dialog" aria-modal="true">
         <div class="confirm-card category-action-card" id="categoryActionCard"></div>
       </div>
