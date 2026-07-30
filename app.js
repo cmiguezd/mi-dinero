@@ -465,7 +465,7 @@ function renderTransfers(){
 function renderLoans(){
   const items=countryItems(state.loans);
   return `${pageHead("Préstamos",`Dinero que debemos y dinero que nos deben.`,`<button class="button" data-add="loan">+ Nuevo préstamo</button>`)}
-  <div class="loan-grid">${items.length?items.map(x=>`<article class="panel budget-card"><div class="budget-top"><div><small class="muted">${x.direction==="owed"?"DINERO QUE DEBEMOS":"DINERO QUE NOS DEBEN"}</small><h3>${escapeHtml(x.person)}</h3></div><div class="row-actions"><button data-edit="loan" data-id="${x.id}">✎</button><button data-delete="loan" data-id="${x.id}">⌫</button></div></div><div class="metric-value">${money(x.balance)}</div><small class="muted">De ${money(x.amount)} · ${dateLabel(x.date)}</small><div class="form-actions"><button class="button ghost" data-pay="${x.id}">Registrar pago</button></div></article>`).join(""):empty("Sin préstamos activos","Registra una obligación o cuenta por cobrar.")}</div>`;
+  <div class="loan-grid">${items.length?items.map(x=>`<article class="panel budget-card"><div class="budget-top"><div><small class="muted">${x.direction==="owed"?"DINERO QUE DEBEMOS":"DINERO QUE NOS DEBEN"}</small><h3>${escapeHtml(x.person)}</h3></div><div class="row-actions"><button data-edit="loan" data-id="${x.id}">✎</button><button data-delete="loan" data-id="${x.id}">⌫</button></div></div><div class="metric-value">${money(x.balance)}</div><small class="muted">De ${money(x.amount)} · ${dateLabel(x.date)}</small><div class="form-actions"><button class="button ghost" data-pay="${x.id}">Registrar abono</button></div></article>`).join(""):empty("Sin préstamos activos","Registra una obligación o cuenta por cobrar.")}</div>`;
 }
 function renderRecurrings(){
   const items=countryItems(state.recurrings);
@@ -641,17 +641,54 @@ function openForm(kind,id=null){
   if(kind==="transaction")html=formField("Descripción","description","text",item?.description||"",null,true)+formField("Tipo","type","text",item?.type||"gasto",typeOpts)+formField(`Monto (${meta[state.country].currency})`,"amount","number",item?.amount||"")+formField("Categoría","category","text",item?.category||categoryNames[0],catOpts)+formField("Fecha","date","date",item?.date||today());
   if(kind==="budget")html=formField("Categoría","category","text",item?.category||categoryNames[0],catOpts)+formField(`Límite (${meta[state.country].currency})`,"amount","number",item?.amount||"");
   if(kind==="transfer")html=formField("Desde","from","text",item?.from||state.country,[{value:"CN",label:"China (RMB)"},{value:"CO",label:"Colombia (COP)"}])+formField("Hacia","to","text",item?.to||(state.country==="CN"?"CO":"CN"),[{value:"CO",label:"Colombia (COP)"},{value:"CN",label:"China (RMB)"}])+formField("Monto enviado","sent","number",item?.sent||"")+formField("Monto recibido","received","number",item?.received||"")+formField("Comisión opcional","fee","number",item?.fee||0)+formField("Fecha","date","date",item?.date||today());
-  if(kind==="loan")html=formField("Tipo","direction","text",item?.direction||"owed",[{value:"owed",label:"Dinero que debemos"},{value:"receivable",label:"Dinero que nos deben"}])+formField("Persona o entidad","person","text",item?.person||"")+formField("Monto original","amount","number",item?.amount||"")+formField("Saldo pendiente","balance","number",item?.balance??item?.amount??"")+formField("Fecha","date","date",item?.date||today());
+  if(kind==="loan")html=formField("Tipo","direction","text",item?.direction||"owed",[{value:"owed",label:"Dinero que debemos"},{value:"receivable",label:"Dinero que nos deben"}])+formField("Persona o entidad","person","text",item?.person||"")+formField("Monto original","amount","number",item?.amount||"")+formField("Saldo pendiente","balance","number",item?.balance??item?.amount??"")+formField("Fecha","date","date",item?.date||today())+(!id?`<label class="form-check full"><input type="checkbox" name="affectBalance" value="yes"><span aria-hidden="true">✓</span><div><strong>Crear también una transacción</strong><small>Actívalo solo si el dinero entra o sale de tu saldo ahora. Déjalo apagado si solo documentas una deuda anterior.</small></div></label>`:"");
   if(kind==="recurring")html=formField("Descripción","description","text",item?.description||"",null,true)+formField("Tipo","type","text",item?.type||"gasto",typeOpts.slice(0,2))+formField("Monto","amount","number",item?.amount||"")+formField("Frecuencia","frequency","text",item?.frequency||"Mensual",[{value:"Mensual",label:"Mensual"},{value:"Semanal",label:"Semanal"},{value:"Anual",label:"Anual"}])+formField("Día de cobro","day","number",item?.day||1);
   $("#recordForm").innerHTML=`<div class="form-grid">${html}</div><div class="form-actions"><button type="button" class="button ghost" data-close>Cancelar</button><button class="button" type="submit">Guardar</button></div>`;
   $("#recordForm").dataset.kind=kind;$("#recordForm").dataset.id=id||"";$("#modal").classList.remove("hidden");bindDatePickers($("#recordForm"));$$("[data-close]",$("#modal")).forEach(x=>x.onclick=closeForm);
 }
 function closeForm(){$("#modal").classList.add("hidden")}
-$("#recordForm").onsubmit=e=>{e.preventDefault();const kind=e.currentTarget.dataset.kind,id=e.currentTarget.dataset.id,data=Object.fromEntries(new FormData(e.currentTarget));const collection={transaction:"transactions",budget:"budgets",transfer:"transfers",loan:"loans",recurring:"recurrings"}[kind];["amount","sent","received","fee","balance","day"].forEach(k=>{if(k in data)data[k]=Number(data[k])});if(kind==="transfer"&&data.from===data.to){toast("El origen y el destino deben ser distintos");return}if(kind==="loan"&&!id)data.balance=data.amount;const record={...data,id:id||uid(kind[0]),country:kind==="transfer"?undefined:state.country,updatedAt:new Date().toISOString()};if(id){state[collection]=state[collection].map(x=>x.id===id?{...x,...record}:x)}else state[collection].push(record);saveState();closeForm();render();toast(id?"Registro actualizado":"Registro guardado")};
+function createLoanCashTransaction({loan,amount,date,stage}){
+  const isOpening=stage==="opening";
+  const cashIn=isOpening?loan.direction==="owed":loan.direction==="receivable";
+  const label=isOpening
+    ?(cashIn?"Préstamo recibido":"Dinero prestado")
+    :(cashIn?"Abono recibido":"Abono pagado");
+  state.transactions.push({
+    id:uid("t"),country:loan.country,type:"ajuste",amount:Math.abs(Number(amount)||0),
+    cashEffect:(cashIn?1:-1)*Math.abs(Number(amount)||0),
+    category:"Préstamos y deudas",description:`${label} · ${loan.person}`,date,
+    loanId:loan.id,loanStage:stage,updatedAt:new Date().toISOString()
+  });
+}
+$("#recordForm").onsubmit=e=>{
+  e.preventDefault();
+  const kind=e.currentTarget.dataset.kind,id=e.currentTarget.dataset.id,data=Object.fromEntries(new FormData(e.currentTarget));
+  if(kind==="loanPayment"){
+    const loan=state.loans.find(x=>x.id===id),value=Number(data.amount);
+    if(!loan||!value||value<=0||value>Number(loan.balance)){toast("Ingresa un abono válido, sin superar el saldo pendiente");return}
+    loan.balance=Number(loan.balance)-value;loan.updatedAt=new Date().toISOString();
+    if(data.affectBalance==="yes")createLoanCashTransaction({loan,amount:value,date:data.date,stage:"payment"});
+    saveState();closeForm();render();toast(data.affectBalance==="yes"?"Abono y transacción registrados":"Abono registrado sin afectar el saldo");return;
+  }
+  const collection={transaction:"transactions",budget:"budgets",transfer:"transfers",loan:"loans",recurring:"recurrings"}[kind];
+  ["amount","sent","received","fee","balance","day"].forEach(k=>{if(k in data)data[k]=Number(data[k])});
+  if(kind==="transfer"&&data.from===data.to){toast("El origen y el destino deben ser distintos");return}
+  const affectBalance=data.affectBalance==="yes";delete data.affectBalance;
+  if(kind==="loan"&&!id)data.balance=data.amount;
+  const record={...data,id:id||uid(kind[0]),country:kind==="transfer"?undefined:state.country,updatedAt:new Date().toISOString()};
+  if(id)state[collection]=state[collection].map(x=>x.id===id?{...x,...record}:x);
+  else{state[collection].push(record);if(kind==="loan"&&affectBalance)createLoanCashTransaction({loan:record,amount:record.amount,date:record.date,stage:"opening"});}
+  saveState();closeForm();render();toast(kind==="loan"&&affectBalance?"Préstamo y transacción registrados":id?"Registro actualizado":"Registro guardado");
+};
 function askDelete(kind,id){pendingDelete={kind,id};let label="este registro";if(kind!=="all"){const collection={transaction:"transactions",budget:"budgets",transfer:"transfers",loan:"loans",recurring:"recurrings"}[kind];const x=state[collection].find(i=>i.id===id);label=x?.description||x?.category||x?.person||"este registro"}$("#confirmText").textContent=kind==="all"?"Se eliminarán todos los datos guardados en este dispositivo.":`Se eliminará “${label}”. Esta acción no se puede deshacer.`;$("#confirmModal").classList.remove("hidden")}
 $("[data-cancel]").onclick=()=>{$("#confirmModal").classList.add("hidden");pendingDelete=null};
 $("#confirmDelete").onclick=()=>{if(!pendingDelete)return;if(pendingDelete.kind==="all")state=blankState();else{const collection={transaction:"transactions",budget:"budgets",transfer:"transfers",loan:"loans",recurring:"recurrings"}[pendingDelete.kind];state[collection]=state[collection].filter(x=>x.id!==pendingDelete.id)}saveState();$("#confirmModal").classList.add("hidden");pendingDelete=null;render();toast("Registro eliminado")};
-function payLoan(id){const loan=state.loans.find(x=>x.id===id);const input=prompt(`Monto del pago. Saldo actual: ${money(loan.balance)}`);if(input===null)return;const value=Number(input);if(!value||value<0||value>loan.balance){toast("Ingresa un monto válido");return}loan.balance-=value;loan.updatedAt=new Date().toISOString();saveState();render();toast("Pago aplicado")}
+function payLoan(id){
+  const loan=state.loans.find(x=>x.id===id);if(!loan)return;
+  $("#modalEyebrow").textContent="PRÉSTAMO";$("#modalTitle").textContent="Registrar abono";
+  $("#recordForm").innerHTML=`<div class="loan-payment-summary"><span>${loan.direction==="owed"?"Le debemos a":"Nos debe"} ${escapeHtml(loan.person)}</span><strong>Saldo pendiente: ${money(loan.balance,loan.country)}</strong></div><div class="form-grid">${formField(`Monto del abono (${meta[loan.country].currency})`,"amount","number","")}${formField("Fecha","date","date",today())}<label class="form-check full"><input type="checkbox" name="affectBalance" value="yes"><span aria-hidden="true">✓</span><div><strong>Crear también una transacción</strong><small>${loan.direction==="owed"?"Registra una salida porque estás devolviendo dinero.":"Registra una entrada porque estás recibiendo el abono."}</small></div></label></div><div class="form-actions"><button type="button" class="button ghost" data-close>Cancelar</button><button class="button" type="submit">Registrar abono</button></div>`;
+  $("#recordForm").dataset.kind="loanPayment";$("#recordForm").dataset.id=id;$("#modal").classList.remove("hidden");bindDatePickers($("#recordForm"));$("[data-close]",$("#modal")).forEach(x=>x.onclick=closeForm);
+}
 function exportData(){const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`mi-dinero-respaldo-${today()}.json`;a.click();URL.revokeObjectURL(a.href);toast("Respaldo exportado")}
 function saveCloudConfig(){const clientId=$("#googleClientId").value.trim(),spreadsheetId=$("#googleSheetId").value.trim();if(!clientId.endsWith(".apps.googleusercontent.com")||!spreadsheetId){toast("Revisa el Client ID y el Sheet ID");return}localStorage.setItem("mi-dinero-cloud-config",JSON.stringify({clientId,spreadsheetId,sheetName:"_AppState"}));toast("Configuración guardada; recargando…");setTimeout(()=>location.reload(),700)}
 function importData(e){const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{try{const imported=JSON.parse(reader.result);if(!imported.transactions||!imported.version)throw Error();state={...blankState(),...imported};saveState();render();toast("Respaldo importado")}catch{toast("El archivo no es un respaldo válido")}};reader.readAsText(file)}
