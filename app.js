@@ -544,7 +544,7 @@ function bindPage(){
   $$("[data-edit]").forEach(b=>b.onclick=()=>openForm(b.dataset.edit,b.dataset.id));
   $$("[data-delete]").forEach(b=>b.onclick=()=>askDelete(b.dataset.delete,b.dataset.id));
   $$("[data-go]").forEach(b=>b.onclick=()=>{currentPage=b.dataset.go;render()});
-  $("[data-pay]").forEach(b=>b.onclick=()=>payLoan(b.dataset.pay));
+  $$("[data-pay]").forEach(b=>b.onclick=()=>payLoan(b.dataset.pay));
   const settledFilter=$("[data-hide-settled-loans]");if(settledFilter)settledFilter.onchange=()=>{hideSettledLoans=settledFilter.checked;localStorage.setItem(LOAN_SETTLED_FILTER_KEY,String(hideSettledLoans));render()};
   document.querySelectorAll("[data-loan-summary]").forEach(b=>b.onclick=()=>openLoanDetail(b.dataset.loanSummary));
   document.querySelectorAll("[data-loan-detail]").forEach(card=>{
