@@ -120,39 +120,12 @@ function shiftedMonth(year,month,delta=0){
     label:`${label.charAt(0).toUpperCase()+label.slice(1)} ${date.getUTCFullYear()}`
   };
 }
-function explicitOpeningBalancesThrough(year,month){
-  const target=`${year}-${month}`;
-  return countryItems(state.transactions)
-    .filter(x=>x.date?.slice(0,7)<=target&&isCarryForwardTransaction(x))
-    .sort((a,b)=>a.date.localeCompare(b.date));
-}
-function cashFlowForMonth(year,month){
-  const ym=`${year}-${month}`;
-  const transactionFlow=countryItems(state.transactions)
-    .filter(x=>x.date?.slice(0,7)===ym&&!isCarryForwardTransaction(x))
-    .reduce((sum,x)=>sum+transactionCashChange(x),0);
-  const transferFlow=state.transfers.reduce((sum,x)=>{
-    if(x.from===state.country&&x.date?.startsWith(ym))sum-=(Number(x.sent)||0)+(Number(x.fee)||0);
-    const receivedDate=x.arrivalDate||x.date;
-    if(x.to===state.country&&receivedDate?.startsWith(ym))sum+=Number(x.received)||0;
-    return sum;
-  },0);
-  return transactionFlow+transferFlow;
-}
 function openingBalanceForMonth(year,month){
-  const target=`${year}-${month}`;
-  const bases=explicitOpeningBalancesThrough(year,month);
-  if(!bases.length)return null;
-  const base=bases[0];
-  let cursor=base.date.slice(0,7);
-  let balance=Number(base.amount)||0;
-  while(cursor<target){
-    const [cursorYear,cursorMonth]=cursor.split("-");
-    balance+=cashFlowForMonth(cursorYear,cursorMonth);
-    const next=shiftedMonth(cursorYear,cursorMonth,1);
-    cursor=`${next.year}-${next.month}`;
-  }
-  return balance;
+  const ym=`${year}-${month}`;
+  const rows=countryItems(state.transactions)
+    .filter(x=>x.date?.slice(0,7)===ym&&isCarryForwardTransaction(x))
+    .sort((a,b)=>a.date.localeCompare(b.date));
+  return rows.length?Number(rows[0].amount)||0:null;
 }
 function isLoanTransaction(x){
   const text=`${x.category||""} ${x.description||""} ${x.originalType||x.tipoOriginal||x.Tipo_original||""}`;
@@ -177,13 +150,17 @@ function monthlyBalanceReconciliation(){
     if(x.to===state.country&&receivedDate?.startsWith(ym))sum+=Number(x.received)||0;
     return sum;
   },0);
+  const next=shiftedMonth(dashboardYear,dashboardMonth,1);
+  const recordedClosing=openingBalanceForMonth(next.year,next.month);
   const calculatedOther=adjustmentFlow+transferFlow;
-  const closing=opening!==null?opening+directFlow+loanFlow+calculatedOther:null;
-  const transferAndAdjustments=calculatedOther;
+  const closing=recordedClosing!==null?recordedClosing:(opening!==null?opening+directFlow+loanFlow+calculatedOther:null);
+  const transferAndAdjustments=opening!==null&&recordedClosing!==null
+    ?recordedClosing-opening-directFlow-loanFlow
+    :calculatedOther;
   return {
     opening,closing,loanFlow,transferAndAdjustments,
     income:periodTotals.income,expense:periodTotals.expense,
-    loanCount:loanTx.length,automaticCarry:opening!==null
+    loanCount:loanTx.length,verified:recordedClosing!==null,nextLabel:next.label
   };
 }
 function signedMoney(value){
@@ -193,15 +170,15 @@ function signedMoney(value){
 function balanceReconciliation(balance){
   const item=(label,value,detail,tone="")=>`<div class="balance-flow-item ${tone}"><span>${label}</span><strong>${value}</strong><small>${detail}</small></div>`;
   const opening=balance.opening===null
-    ?item("Mes anterior","No disponible","No existe un saldo base anterior")
-    :item("Mes anterior",money(balance.opening),"Saldo final calculado del mes anterior");
+    ?item("Mes anterior","No disponible","No existe un saldo trasladado")
+    :item("Mes anterior",money(balance.opening),"Punto de partida; no cuenta como ingreso");
   const income=item("Ingresos del mes",`+${money(balance.income)}`,"Ingresos reales, sin préstamos","in");
   const loans=item("Préstamos y deudas",signedMoney(balance.loanFlow),balance.loanCount?"Entradas y pagos de capital del mes":"Sin movimientos de deuda",balance.loanFlow<0?"out":balance.loanFlow>0?"in":"");
   const transfers=item("Transferencias y ajustes",signedMoney(balance.transferAndAdjustments),"Movimientos de caja fuera de ingresos y gastos",balance.transferAndAdjustments<0?"out":balance.transferAndAdjustments>0?"in":"");
   const expenses=item("Gastos del mes",`−${money(balance.expense)}`,"Consumo y gastos reales","out");
   const closing=balance.closing===null
     ?item("Saldo final","No disponible","Falta un saldo de apertura o cierre")
-    :item("Saldo final",money(balance.closing),"Se arrastra automáticamente al mes siguiente",balance.closing<0?"out":"in");
+    :item(balance.verified?"Saldo final":"Saldo final estimado",money(balance.closing),balance.verified?`Conciliado con ${balance.nextLabel}`:"Resultado de las cinco tarjetas anteriores",balance.closing<0?"out":"in");
   return `<div class="balance-flow">${opening}${income}${loans}${transfers}${expenses}${closing}</div>`;
 }
 function expenseGroups(tx=dashboardTransactions()){
@@ -327,11 +304,16 @@ function dailyBalanceChart(){
       if(day>=1&&day<=maxDay)changes[day]+=Number(x.received)||0;
     }
   });
+  const next=shiftedMonth(dashboardYear,dashboardMonth,1);
+  const recordedClosing=openingBalanceForMonth(next.year,next.month);
   const points=[{day:0,label:"Inicio",value:opening}];
   let running=opening;
   for(let day=1;day<=maxDay;day++){
     running+=changes[day];
     points.push({day,label:`Día ${day}`,value:running});
+  }
+  if(recordedClosing!==null&&!isCurrentMonth&&points.length>1){
+    points[points.length-1].value=recordedClosing;
   }
   const width=960,height=300,pad={left:82,right:24,top:18,bottom:42};
   const values=points.map(x=>x.value),rawMin=Math.min(...values),rawMax=Math.max(...values);
@@ -353,7 +335,7 @@ function dailyBalanceChart(){
     const label=`${p.label} · ${chartMoney(p.value)}`;
     return `<button type="button" class="daily-balance-hit ${alignment}" style="left:${p.x/width*100}%;top:${p.y/height*100}%" data-tooltip="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"></button>`;
   }).join("");
-  return `<div class="daily-balance-scroll"><div class="daily-balance-chart"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Evolución diaria del saldo en ${escapeAttr(periodLabel())}"><defs><linearGradient id="dailyBalanceArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--accent)" stop-opacity=".30"/><stop offset="100%" stop-color="var(--accent)" stop-opacity=".02"/></linearGradient></defs>${yTicks}<path d="${area}" class="daily-balance-area"/><path d="${path}" class="daily-balance-line"/>${coordinates.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3.5" class="daily-balance-dot"/>`).join("")}${xTicks}</svg>${hits}</div></div><div class="daily-balance-summary"><span>Saldo inicial <strong>${chartMoney(opening)}</strong></span><span>${isCurrentMonth?"Saldo al último día registrado":"Saldo final del mes"} <strong>${chartMoney(points[points.length-1].value)}</strong></span></div>`;
+  return `<div class="daily-balance-scroll"><div class="daily-balance-chart"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Evolución diaria del saldo en ${escapeAttr(periodLabel())}"><defs><linearGradient id="dailyBalanceArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--accent)" stop-opacity=".30"/><stop offset="100%" stop-color="var(--accent)" stop-opacity=".02"/></linearGradient></defs>${yTicks}<path d="${area}" class="daily-balance-area"/><path d="${path}" class="daily-balance-line"/>${coordinates.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3.5" class="daily-balance-dot"/>`).join("")}${xTicks}</svg>${hits}</div></div><div class="daily-balance-summary"><span>Saldo inicial <strong>${chartMoney(opening)}</strong></span><span>${recordedClosing!==null&&!isCurrentMonth?"Saldo final conciliado":"Saldo al último día registrado"} <strong>${chartMoney(points[points.length-1].value)}</strong></span></div>`;
 }
 function flexibleBreakdown(groups,total){
   const items=groups.filter(([c])=>isFlexibleCategory(c)).slice(0,7);
