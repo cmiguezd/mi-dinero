@@ -271,7 +271,7 @@ function merchantParticipation(groups){
   const segments=groups.map((item,i)=>{
     const percent=totalAmount?item.amount/totalAmount*100:0,offset=-cursor;cursor+=percent;
     const selected=dashboardMerchant===item.key,dimmed=dashboardMerchant&&!selected;
-    const detail=`${Math.round(percent)}% · ${money(item.amount)} · ${item.count} movimiento${item.count===1?"":"s"}`;
+    const detail=`${item.count} movimiento${item.count===1?"":"s"}`;
     return `<circle class="donut-segment ${selected?"is-selected":""} ${dimmed?"is-dimmed":""}" cx="50" cy="50" r="40" pathLength="100" fill="none" stroke="${colors[i%colors.length]}" stroke-width="18" stroke-dasharray="${percent} ${100-percent}" stroke-dashoffset="${offset}" data-merchant-filter="${escapeAttr(item.key)}" data-tooltip-title="${escapeAttr(item.label)}" data-tooltip-detail="${escapeAttr(detail)}" data-tooltip-color="${colors[i%colors.length]}" tabindex="0" role="button" aria-label="${escapeAttr(item.label+" · "+detail)}"></circle>`;
   }).join("");
   const legend=groups.map((item,i)=>{
