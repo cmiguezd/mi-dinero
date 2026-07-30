@@ -1055,3 +1055,10 @@ body[data-country="CO"] .info-notice>span{color:#211b00}
 @media(max-width:430px){
   .recurring-page-actions .recurring-total-cards,.recurring-action-buttons{grid-template-columns:1fr}
 }
+
+
+/* Filtros combinables de transacciones */
+.transaction-filters{display:grid;grid-template-columns:minmax(220px,300px) minmax(180px,1fr) minmax(210px,1fr)}
+.transaction-filters .input{max-width:none}
+@media(max-width:780px){.transaction-filters{grid-template-columns:1fr 1fr}.transaction-filters .input{grid-column:1/-1}}
+@media(max-width:560px){.transaction-filters{grid-template-columns:1fr}.transaction-filters .input{grid-column:auto}}

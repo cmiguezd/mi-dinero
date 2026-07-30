@@ -446,12 +446,13 @@ function flexibleBreakdown(groups,total){
 }
 function renderTransactions(){
   const tx=dashboardTransactions({ignoreCategory:true}).sort((a,b)=>b.date.localeCompare(a.date)||Number(b.amount||0)-Number(a.amount||0));
+  const categories=[...new Set(tx.map(x=>x.category||"Sin categoría"))].sort((a,b)=>a.localeCompare(b,"es"));
   const actions=`<div class="page-head-actions"><button class="button ghost" type="button" id="exportTransactions">↓ Exportar Excel</button><button class="button" data-add="transaction">+ Nueva transacción</button></div>`;
-  return `${pageHead("Todos tus movimientos",`${tx.length} registros de ${periodLabel()} en ${meta[state.country].name}.`,actions)}
-  <div class="filters"><input class="input" id="searchTx" placeholder="Buscar por descripción o categoría"><select class="select" id="typeFilter"><option value="">Todos los tipos</option><option value="gasto">Gastos</option><option value="ingreso">Ingresos</option><option value="cobro">Cobros</option><option value="ajuste">Ajustes</option></select></div>
+  return `${pageHead("Todos tus movimientos",`<span id="transactionCount">${tx.length}</span> registros de ${periodLabel()} en ${meta[state.country].name}.`,actions)}
+  <div class="filters transaction-filters"><input class="input" id="searchTx" placeholder="Buscar por descripción o categoría" aria-label="Buscar transacciones"><select class="select" id="typeFilter" aria-label="Filtrar por tipo"><option value="">Todos los tipos</option><option value="gasto">Gastos</option><option value="ingreso">Ingresos</option><option value="cobro">Cobros</option><option value="ajuste">Ajustes</option></select><select class="select" id="categoryFilter" aria-label="Filtrar por categoría"><option value="">Todas las categorías</option>${categories.map(category=>`<option value="${escapeAttr(category)}">${escapeHtml(category)}</option>`).join("")}</select></div>
   <div class="panel table-panel" id="txList">${tx.length?transactionRows(tx):empty("Aún no hay transacciones","Registra un gasto, ingreso, cobro o ajuste.")}</div>`;
 }
-function transactionRows(tx){return `<div class="transaction-list">${tx.map(x=>`<div class="transaction-row" data-transaction-id="${x.id}" data-search="${(x.description+" "+x.category+" "+x.type).toLowerCase()}" data-type="${x.type}"><div class="tx-icon">${x.type==="gasto"?"↓":"↑"}</div><div><strong>${escapeHtml(x.description)}</strong><small>${escapeHtml(x.category)} · ${dateLabel(x.date)}</small></div><span class="amount ${x.type}">${x.type==="gasto"?"−":"+"}${money(x.amount,x.country)}</span><div class="row-actions"><button data-edit="transaction" data-id="${x.id}" title="Editar">✎</button><button data-delete="transaction" data-id="${x.id}" title="Eliminar">⌫</button></div></div>`).join("")}</div>`}
+function transactionRows(tx){return `<div class="transaction-list">${tx.map(x=>`<div class="transaction-row" data-transaction-id="${x.id}" data-search="${escapeAttr(`${x.description||""} ${x.category||""} ${x.type||""}`.toLocaleLowerCase("es"))}" data-type="${escapeAttr(x.type||"")}" data-category="${escapeAttr(x.category||"Sin categoría")}"><div class="tx-icon">${x.type==="gasto"?"↓":"↑"}</div><div><strong>${escapeHtml(x.description)}</strong><small>${escapeHtml(x.category)} · ${dateLabel(x.date)}</small></div><span class="amount ${x.type}">${x.type==="gasto"?"−":"+"}${money(x.amount,x.country)}</span><div class="row-actions"><button data-edit="transaction" data-id="${x.id}" title="Editar">✎</button><button data-delete="transaction" data-id="${x.id}" title="Eliminar">⌫</button></div></div>`).join("")}</div>`}
 function spentByCategory(category){return dashboardTransactions({ignoreCategory:true}).filter(x=>x.type==="gasto"&&x.category===category).reduce((a,b)=>a+Number(b.amount),0)}
 function renderBudgets(){
   const items=countryItems(state.budgets);
@@ -571,7 +572,7 @@ function bindPage(){
       clearRecurringChecks();render();toast("Checks reiniciados");
     }
   };
-  const search=$("#searchTx"),filter=$("#typeFilter");if(search)search.oninput=filterTransactions;if(filter)filter.onchange=filterTransactions;const exportTransactionsButton=$("#exportTransactions");if(exportTransactionsButton)exportTransactionsButton.onclick=exportVisibleTransactions;
+  const search=$("#searchTx"),typeFilter=$("#typeFilter"),categoryFilter=$("#categoryFilter");if(search)search.oninput=filterTransactions;if(typeFilter)typeFilter.onchange=filterTransactions;if(categoryFilter)categoryFilter.onchange=filterTransactions;const exportTransactionsButton=$("#exportTransactions");if(exportTransactionsButton)exportTransactionsButton.onclick=exportVisibleTransactions;
   const year=$("#globalYear"),month=$("#globalMonth");if(year)year.onchange=()=>{dashboardYear=year.value;dashboardCategory="";dashboardMerchant="";savePeriod();render()};if(month)month.onchange=()=>{dashboardMonth=month.value;dashboardCategory="";dashboardMerchant="";savePeriod();render()};
   $$("[data-month-filter]").forEach(b=>b.onclick=()=>{dashboardMonth=dashboardMonth===b.dataset.monthFilter?"all":b.dataset.monthFilter;savePeriod();render()});
   $$("[data-category-filter]").forEach(b=>{b.onclick=()=>{dashboardCategory=dashboardCategory===b.dataset.categoryFilter?"":b.dataset.categoryFilter;render()};b.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();b.click()}}});
@@ -650,7 +651,22 @@ function bindPage(){
   if($("#exportData"))$("#exportData").onclick=exportData;if($("#importData"))$("#importData").onchange=importData;if($("#resetData"))$("#resetData").onclick=()=>askDelete("all","all");
   if($("#connectGoogle"))$("#connectGoogle").onclick=()=>window.MiDineroCloud?.connect();if($("#disconnectGoogle"))$("#disconnectGoogle").onclick=()=>window.MiDineroCloud?.disconnect();if($("#syncNow"))$("#syncNow").onclick=()=>window.MiDineroCloud?.pull();if($("#saveCloudConfig"))$("#saveCloudConfig").onclick=saveCloudConfig;
 }
-function filterTransactions(){const q=$("#searchTx").value.toLowerCase(),type=$("#typeFilter").value;$(".transaction-row",$("#txList")).forEach(r=>r.style.display=(!q||r.dataset.search.includes(q))&&(!type||r.dataset.type===type)?"grid":"none")}
+function filterTransactions(){
+  const q=($("#searchTx")?.value||"").trim().toLocaleLowerCase("es");
+  const type=$("#typeFilter")?.value||"";
+  const category=$("#categoryFilter")?.value||"";
+  let visible=0;
+  $("#txList")?.querySelectorAll(".transaction-row[data-transaction-id]").forEach(row=>{
+    const matchesSearch=!q||(row.dataset.search||"").includes(q);
+    const matchesType=!type||row.dataset.type===type;
+    const matchesCategory=!category||row.dataset.category===category;
+    const show=matchesSearch&&matchesType&&matchesCategory;
+    row.style.display=show?"grid":"none";
+    if(show)visible++;
+  });
+  const count=$("#transactionCount");
+  if(count)count.textContent=String(visible);
+}
 function exportVisibleTransactions(){
   const visibleIds=$$(".transaction-row[data-transaction-id]",$("#txList")).filter(row=>row.style.display!=="none").map(row=>row.dataset.transactionId);
   const byId=new Map(state.transactions.map(x=>[String(x.id),x]));
