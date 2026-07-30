@@ -196,7 +196,7 @@ function merchantGroups(tx=dashboardTransactions({ignoreMerchant:true})){
     const key=merchantKey(label),current=map.get(key)||{key,label,count:0,amount:0};
     current.count+=1;current.amount+=Number(x.amount||0);map.set(key,current);
   });
-  return [...map.values()].sort((a,b)=>b.amount-a.amount||b.count-a.count||a.label.localeCompare(b.label,"es")).slice(0,10);
+  return [...map.values()]\n    .sort((a,b)=>b.count-a.count||b.amount-a.amount||a.label.localeCompare(b.label,"es"))\n    .slice(0,10)\n    .sort((a,b)=>b.amount-a.amount||b.count-a.count||a.label.localeCompare(b.label,"es"));
 }
 function isFlexibleCategory(category=""){
   return /(restaur|comida|aliment|mercado|compra|entreten|ocio|viaje|belleza|hormiga|transporte|delivery|ropa|regalo|suscrip)/i.test(category);
@@ -227,7 +227,7 @@ function renderDashboard(){
   <div class="analysis-grid analysis-grid-three">
     <div class="panel category-panel"><div class="panel-head"><div><h3>Participación por categoría</h3><small>Qué categorías concentran el gasto</small></div></div>${categoryParticipation(groups,categoryTotal)}</div>
     <div class="panel timeline-panel"><div class="panel-head"><div><h3>${dashboardMonth==="all"?"Gasto por mes":"Gasto por semana"}</h3><small>Valores del periodo seleccionado</small></div></div>${spendingTimeline(timelineTx)}</div>
-    <div class="panel category-panel merchant-panel"><div class="panel-head"><div><h3>Gasto por nombre</h3><small>Los 10 nombres con mayor valor gastado</small></div></div>${merchantParticipation(merchants)}</div>
+    <div class="panel category-panel merchant-panel"><div class="panel-head"><div><h3>Gasto por nombre</h3><small>Top 10 por frecuencia, ordenado por valor gastado</small></div></div>${merchantParticipation(merchants)}</div>
   </div>
   <div class="analysis-grid lower">
     <div class="panel"><div class="panel-head"><div><h3>Gastos con margen de ajuste</h3><small>Restaurantes, compras, ocio y categorías similares</small></div></div>${flexibleBreakdown(selectedGroups,t.expense)}</div>
@@ -276,7 +276,7 @@ function merchantParticipation(groups){
     const detail=`${percent}% · ${money(item.amount)} · ${item.count} movimiento${item.count===1?"":"s"}`;
     return `<button type="button" class="${selected?"is-selected":""} ${dimmed?"is-dimmed":""}" data-merchant-filter="${escapeAttr(item.key)}" title="${escapeAttr(item.label+" · "+detail)}"><i style="background:${colors[i%colors.length]}"></i><span>${escapeHtml(item.label)}</span><strong>${percent}%</strong><small>${money(item.amount)}</small></button>`;
   }).join("");
-  return `<div class="category-visual merchant-visual"><div class="donut-wrap"><svg class="donut-svg" viewBox="0 0 100 100" aria-label="Los diez nombres con mayor gasto">${segments}</svg><div class="donut-center"><strong>${money(totalAmount)}</strong><span>${totalCount} movimientos</span></div><div class="donut-tooltip" role="tooltip" aria-hidden="true"><strong></strong><span></span></div></div><div class="category-legend">${legend}</div></div>`;
+  return `<div class="category-visual merchant-visual"><div class="donut-wrap"><svg class="donut-svg" viewBox="0 0 100 100" aria-label="Los diez nombres más frecuentes, ordenados por valor gastado">${segments}</svg><div class="donut-center"><strong>${money(totalAmount)}</strong><span>${totalCount} movimientos</span></div><div class="donut-tooltip" role="tooltip" aria-hidden="true"><strong></strong><span></span></div></div><div class="category-legend">${legend}</div></div>`;
 }
 function spendingTimeline(tx){
   const expenses=tx.filter(x=>x.type==="gasto");
