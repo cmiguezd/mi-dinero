@@ -89,7 +89,7 @@ function openCategoryActionDialog(mode,name){
       <div class="form-actions"><button type="button" class="button ghost" data-category-action-close>Cancelar</button><button type="button" class="button danger" id="confirmCategoryDelete">Eliminar</button></div>`;
   }
   modal.classList.remove("hidden");
-  requestAnimationFrame(()=>$("#categoryRenameInput")?.select()||$("[data-category-action-close]",card)?.focus());
+  requestAnimationFrame(()=>{const input=$("#categoryRenameInput",card);if(input)input.select();else $("[data-category-action-close]",card)?.focus()});
   const close=()=>modal.classList.add("hidden");
   $("[data-category-action-close]",card).forEach(button=>button.onclick=close);
   modal.onclick=e=>{if(e.target===modal)close()};
