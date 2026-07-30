@@ -851,7 +851,20 @@ body[data-country="CO"] .info-notice>span{color:#211b00}
 .category-manager-row>div:first-child{display:grid;min-width:0;gap:2px}
 .category-manager-row strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
 .category-manager-row small{color:var(--muted);font-size:10px}
-.category-manager-row .row-actions{flex:0 0 auto}\n.category-manager-row .row-actions button{width:auto;padding:0 9px;font-size:11px}
-.category-manager-row .row-actions button.is-disabled{opacity:.35}
+.category-manager-row .row-actions{flex:0 0 auto}
+.category-row-actions{display:flex;align-items:center;gap:7px}
+.category-row-actions button{display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;padding:0;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--muted);font-size:15px;cursor:pointer;transition:border-color .18s,background .18s,color .18s,transform .18s}
+.category-row-actions button:hover{border-color:var(--accent);background:var(--accent-soft);color:var(--text);transform:translateY(-1px)}
+.category-row-actions button:focus-visible{outline:2px solid color-mix(in srgb,var(--accent) 60%,transparent);outline-offset:2px}
+.category-row-actions button.is-disabled{opacity:.48}
+.category-action-backdrop{z-index:30}
+.category-action-card{width:min(430px,100%);text-align:left}
+.category-action-card form label{display:grid;gap:7px;color:var(--muted);font-size:12px;font-weight:700}
+.category-action-card .form-actions{margin-top:18px}
+.category-action-message{display:flex;align-items:flex-start;gap:13px;color:var(--muted);line-height:1.45}
+.category-action-message .danger-icon{flex:0 0 auto}
+.category-action-message p{display:grid;gap:4px;margin:2px 0 0}
+.category-action-message strong{color:var(--text);font-size:14px}
+.category-action-message span{font-size:12px}
 @media(max-width:780px){.category-manager-head{align-items:stretch;flex-direction:column}.category-manager-actions{width:100%}.category-manager-actions .button{flex:1}.category-add{width:100%;max-width:none}.category-manager-list{grid-template-columns:1fr}}
 @media(max-width:520px){.category-add{flex-direction:column}.category-add .button{width:100%}.category-manager-modal{padding:19px}.category-manager-row{padding:10px}}

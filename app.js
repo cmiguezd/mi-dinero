@@ -56,28 +56,48 @@ function addCategory(){
   categoryRegistry().push(name);categoryRegistry().sort((a,b)=>a.localeCompare(b,"es"));
   saveState();render();toast("Categoría agregada para ambos países");
 }
-function renameCategory(oldName){
-  const entered=window.prompt("Nuevo nombre de la categoría:",oldName);
-  if(entered===null)return;
-  const name=entered.trim().replace(/\s+/g," ");
-  if(!name){toast("El nombre no puede quedar vacío");return}
-  if(name!==oldName&&availableCategories().some(x=>x.localeCompare(name,"es",{sensitivity:"accent"})===0)){toast("Ya existe una categoría con ese nombre");return}
+function applyCategoryRename(oldName,name){
+  name=name.trim().replace(/\s+/g," ");
+  if(!name){toast("El nombre no puede quedar vacío");return false}
+  if(name!==oldName&&availableCategories().some(x=>x.localeCompare(name,"es",{sensitivity:"accent"})===0)){toast("Ya existe una categoría con ese nombre");return false}
   state.categories=categoryRegistry().map(x=>x===oldName?name:x);
   ["transactions","budgets","recurrings"].forEach(collection=>{
     state[collection]=state[collection].map(x=>x.category===oldName?{...x,category:name,updatedAt:new Date().toISOString()}:x);
   });
   if(dashboardCategory===oldName)dashboardCategory=name;
   saveState();render();toast("Categoría actualizada en ambos países");
+  return true;
 }
-function deleteCategory(name){
-  const usage=categoryUsage(name);
-  if(usage){
-    window.alert(`No se puede eliminar “${name}” porque tiene ${usage} transacción${usage===1?"":"es"} asignada${usage===1?"":"s"} entre China y Colombia. Primero reasigna esas transacciones a otra categoría.`);
-    return;
-  }
-  if(!window.confirm(`¿Eliminar la categoría compartida “${name}”?`))return;
+function removeCategory(name){
   state.categories=categoryRegistry().filter(x=>x!==name);
   saveState();render();toast("Categoría eliminada");
+}
+function openCategoryActionDialog(mode,name){
+  const modal=$("#categoryActionModal"),card=$("#categoryActionCard");
+  if(!modal||!card)return;
+  const usage=categoryUsage(name);
+  if(mode==="rename"){
+    card.innerHTML=`<div class="modal-head"><div><p class="eyebrow">CATEGORÍA</p><h2>Editar nombre</h2></div><button type="button" class="icon-button" data-category-action-close aria-label="Cerrar">×</button></div>
+      <form id="categoryRenameForm"><label>Nombre de la categoría<input class="input" id="categoryRenameInput" maxlength="60" value="${escapeAttr(name)}" autocomplete="off"></label><div class="form-actions"><button type="button" class="button ghost" data-category-action-close>Cancelar</button><button type="submit" class="button">Guardar cambios</button></div></form>`;
+  }else if(usage){
+    card.innerHTML=`<div class="modal-head"><div><p class="eyebrow">CATEGORÍA</p><h2>No se puede eliminar</h2></div><button type="button" class="icon-button" data-category-action-close aria-label="Cerrar">×</button></div>
+      <div class="category-action-message"><div class="danger-icon">!</div><p><strong>“${escapeHtml(name)}” tiene ${usage} transacción${usage===1?"":"es"} asignada${usage===1?"":"s"}.</strong><span>Primero debes reasignarlas a otra categoría en China o Colombia.</span></p></div>
+      <div class="form-actions"><button type="button" class="button" data-category-action-close>Entendido</button></div>`;
+  }else{
+    card.innerHTML=`<div class="modal-head"><div><p class="eyebrow">CATEGORÍA</p><h2>Eliminar categoría</h2></div><button type="button" class="icon-button" data-category-action-close aria-label="Cerrar">×</button></div>
+      <div class="category-action-message"><div class="danger-icon">!</div><p><strong>¿Eliminar “${escapeHtml(name)}”?</strong><span>Esta categoría se quitará del catálogo compartido de China y Colombia.</span></p></div>
+      <div class="form-actions"><button type="button" class="button ghost" data-category-action-close>Cancelar</button><button type="button" class="button danger" id="confirmCategoryDelete">Eliminar</button></div>`;
+  }
+  modal.classList.remove("hidden");
+  requestAnimationFrame(()=>{const input=$("#categoryRenameInput",card);if(input)input.select();else $("[data-category-action-close]",card)?.focus()});
+  const close=()=>modal.classList.add("hidden");
+  $("[data-category-action-close]",card).forEach(button=>button.onclick=close);
+  modal.onclick=e=>{if(e.target===modal)close()};
+  modal.onkeydown=e=>{if(e.key==="Escape"){e.stopPropagation();close()}};
+  const form=$("#categoryRenameForm",card);
+  if(form)form.onsubmit=e=>{e.preventDefault();applyCategoryRename(name,$("#categoryRenameInput",card).value)};
+  const confirm=$("#confirmCategoryDelete",card);
+  if(confirm)confirm.onclick=()=>removeCategory(name);
 }
 function pageHead(title,description,action=""){return `<div class="page-head"><div><h2>${title}</h2><p>${description}</p></div>${action}</div>`}
 function empty(title,text){return `<div class="empty"><div><strong>${title}</strong>${text}</div></div>`}
@@ -463,7 +483,10 @@ function renderSettings(){const cloud=window.MiDineroCloud,connected=cloud?.isCo
     <div class="modal-card category-manager-modal">
       <div class="modal-head"><div><p class="eyebrow">CONFIGURACIÓN</p><h2 id="categoryManagerTitle">Editar categorías</h2></div><button type="button" class="icon-button" id="closeCategoryManager" aria-label="Cerrar">×</button></div>
       <div class="info-notice"><span aria-hidden="true">i</span><p><strong>Importante:</strong> no puedes eliminar una categoría si tiene transacciones asignadas en China o Colombia. Primero debes reasignarlas a otra categoría.</p></div>
-      <div class="category-manager-list">${categories.map(name=>{const usage=categoryUsage(name);return `<div class="category-manager-row"><div><strong>${escapeHtml(name)}</strong><small>${usage} transacción${usage===1?"":"es"}</small></div><div class="row-actions"><button type="button" data-category-rename="${escapeAttr(name)}" title="Editar categoría">Editar</button><button type="button" data-category-delete="${escapeAttr(name)}" class="${usage?"is-disabled":""}" aria-disabled="${Boolean(usage)}" title="${usage?"No se puede eliminar: tiene transacciones asignadas":"Eliminar categoría"}">Eliminar</button></div></div>`}).join("")}</div>
+      <div class="category-manager-list">${categories.map(name=>{const usage=categoryUsage(name);return `<div class="category-manager-row"><div><strong>${escapeHtml(name)}</strong><small>${usage} transacción${usage===1?"":"es"}</small></div><div class="row-actions category-row-actions"><button type="button" data-category-rename="${escapeAttr(name)}" aria-label="Editar ${escapeAttr(name)}" title="Editar categoría">✎</button><button type="button" data-category-delete="${escapeAttr(name)}" class="${usage?"is-disabled":""}" aria-label="Eliminar ${escapeAttr(name)}" title="${usage?"Ver por qué no se puede eliminar":"Eliminar categoría"}">⌫</button></div></div>`}).join("")}</div>
+      <div class="modal-backdrop hidden category-action-backdrop" id="categoryActionModal" role="dialog" aria-modal="true">
+        <div class="confirm-card category-action-card" id="categoryActionCard"></div>
+      </div>
     </div>
   </div>
   <div class="settings-grid"><div class="panel appearance-panel"><h3>Apariencia</h3><p class="muted">Elige cómo quieres ver la aplicación en este dispositivo.</p><div class="theme-selector" role="group" aria-label="Modo de apariencia"><button type="button" data-theme-option="light" class="${colorTheme==="light"?"active":""}" aria-pressed="${colorTheme==="light"}"><span aria-hidden="true">☀</span><strong>Modo día</strong><small>Fondo claro</small></button><button type="button" data-theme-option="dark" class="${colorTheme==="dark"?"active":""}" aria-pressed="${colorTheme==="dark"}"><span aria-hidden="true">☾</span><strong>Modo noche</strong><small>Fondo oscuro</small></button></div></div><div class="panel"><h3>Cuenta</h3><div class="settings-row"><span>Nombre</span><strong>${escapeHtml(state.settings.user)}</strong></div><div class="settings-row"><span>Almacenamiento</span><strong>${connected?"Google Sheets + dispositivo":"Este dispositivo"}</strong></div><div class="cloud-status" id="cloudStatus">${escapeHtml(status)}</div><div class="form-actions" style="justify-content:flex-start">${connected?`<button class="button" id="syncNow">Sincronizar ahora</button><button class="button ghost" id="disconnectGoogle">Desconectar</button>`:`<button class="button" id="connectGoogle">Conectar Google Sheets</button>`}</div></div>
@@ -562,9 +585,9 @@ function bindPage(){
   if(categoryManagerModal)categoryManagerModal.onclick=e=>{if(e.target===categoryManagerModal)closeCategoryManager()};
   if($("#addCategory"))$("#addCategory").onclick=addCategory;
   if($("#newCategoryName"))$("#newCategoryName").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();addCategory()}};
-  document.querySelectorAll("[data-category-rename]").forEach(button=>button.onclick=()=>renameCategory(button.dataset.categoryRename));
-  document.querySelectorAll("[data-category-delete]").forEach(button=>button.onclick=()=>deleteCategory(button.dataset.categoryDelete));
-  if(categoryManagerModal)categoryManagerModal.onkeydown=e=>{if(e.key==="Escape")closeCategoryManager()};
+  document.querySelectorAll("[data-category-rename]").forEach(button=>button.onclick=()=>openCategoryActionDialog("rename",button.dataset.categoryRename));
+  document.querySelectorAll("[data-category-delete]").forEach(button=>button.onclick=()=>openCategoryActionDialog("delete",button.dataset.categoryDelete));
+  if(categoryManagerModal)categoryManagerModal.onkeydown=e=>{if(e.key==="Escape"&&$("#categoryActionModal")?.classList.contains("hidden"))closeCategoryManager()};
   if($("#exportData"))$("#exportData").onclick=exportData;if($("#importData"))$("#importData").onchange=importData;if($("#resetData"))$("#resetData").onclick=()=>askDelete("all","all");
   if($("#connectGoogle"))$("#connectGoogle").onclick=()=>window.MiDineroCloud?.connect();if($("#disconnectGoogle"))$("#disconnectGoogle").onclick=()=>window.MiDineroCloud?.disconnect();if($("#syncNow"))$("#syncNow").onclick=()=>window.MiDineroCloud?.pull();if($("#saveCloudConfig"))$("#saveCloudConfig").onclick=saveCloudConfig;
 }
