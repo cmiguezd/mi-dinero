@@ -462,10 +462,47 @@ function renderTransfers(){
   return `${pageHead("Transferencias",`Movimientos vinculados que no cuentan como ingreso ni gasto.`,`<button class="button" data-add="transfer">+ Nueva transferencia</button>`)}
   <div class="panel table-panel">${items.length?`<div class="transaction-list">${items.map(x=>`<div class="transaction-row"><div class="tx-icon">⇄</div><div><strong>${meta[x.from].name} → ${meta[x.to].name}</strong><small>${dateLabel(x.date)} · Comisión ${money(x.fee||0,x.from)}</small></div><span class="amount">${money(x.sent,x.from)} → ${money(x.received,x.to)}</span><div class="row-actions"><button data-edit="transfer" data-id="${x.id}">✎</button><button data-delete="transfer" data-id="${x.id}">⌫</button></div></div>`).join("")}</div>`:empty("Sin transferencias","Registra manualmente los valores enviados y recibidos.")}</div>`;
 }
+function loanPaymentHistory(loan){
+  const saved=Array.isArray(loan.payments)?loan.payments.map(x=>({...x,amount:Number(x.amount)||0})):[],savedTransactionIds=new Set(saved.map(x=>x.transactionId).filter(Boolean));
+  const linked=state.transactions.filter(x=>x.loanId===loan.id&&x.loanStage==="payment"&&!savedTransactionIds.has(x.id)).map(x=>({id:`legacy_${x.id}`,amount:Number(x.amount)||0,date:x.date,affectBalance:true,transactionId:x.id,legacy:true}));
+  const known=[...saved,...linked],paid=Math.max(0,Number(loan.amount||0)-Number(loan.balance||0)),knownTotal=known.reduce((sum,x)=>sum+Number(x.amount||0),0),untracked=Math.max(0,paid-knownTotal);
+  if(untracked>.0001)known.push({id:`historic_${loan.id}`,amount:untracked,date:"",legacy:true,untracked:true});
+  return known.sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+}
+function loanEntityGroups(items){
+  const groups=new Map();
+  items.forEach(loan=>{
+    const person=String(loan.person||"Sin nombre").trim()||"Sin nombre",key=`${loan.direction}::${person.toLocaleLowerCase("es")}`;
+    const group=groups.get(key)||{key,person,direction:loan.direction,loans:[],amount:0,balance:0};
+    group.loans.push(loan);group.amount+=Number(loan.amount)||0;group.balance+=Number(loan.balance)||0;groups.set(key,group);
+  });
+  return [...groups.values()].map(x=>({...x,paid:Math.max(0,x.amount-x.balance)})).sort((a,b)=>b.balance-a.balance||a.person.localeCompare(b.person,"es"));
+}
+function loanDetailModal(){
+  return `<div class="modal-backdrop hidden" id="loanDetailModal" role="dialog" aria-modal="true" aria-labelledby="loanDetailTitle"><div class="modal-card loan-detail-modal" id="loanDetailCard"></div></div>`;
+}
+function renderLoanDetail(group){
+  const operations=group.loans.flatMap(loan=>{
+    const opening={kind:"opening",date:loan.date,amount:Number(loan.amount)||0,balance:Number(loan.amount)||0,loan,note:loan.note||""};
+    let running=Number(loan.amount)||0;
+    const payments=loanPaymentHistory(loan).slice().sort((a,b)=>(a.date||"9999").localeCompare(b.date||"9999")).map(payment=>{running=Math.max(0,running-Number(payment.amount||0));return {kind:"payment",date:payment.date,amount:Number(payment.amount)||0,balance:running,loan,payment}});
+    return [opening,...payments];
+  }).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(a.kind==="payment"?-1:1));
+  return `<div class="modal-head"><div><p class="eyebrow">${group.direction==="owed"?"DINERO QUE DEBEMOS":"DINERO QUE NOS DEBEN"}</p><h2 id="loanDetailTitle">${escapeHtml(group.person)}</h2></div><button type="button" class="icon-button" data-close-loan-detail aria-label="Cerrar">×</button></div>
+    <div class="loan-detail-totals"><div><span>Deuda original</span><strong>${money(group.amount)}</strong></div><div><span>Abonos</span><strong>${money(group.paid)}</strong></div><div class="remaining"><span>Saldo restante</span><strong>${money(group.balance)}</strong></div></div>
+    <div class="loan-detail-list">${operations.map(op=>`<article class="loan-history-row ${op.kind}"><span class="loan-history-dot" aria-hidden="true"></span><div class="loan-history-copy"><div><strong>${op.kind==="opening"?"Operación inicial":op.payment?.untracked?"Abonos anteriores":"Abono"}</strong><time>${op.date?dateLabel(op.date):"Sin fecha registrada"}</time></div><p>${op.kind==="opening"?(op.note?escapeHtml(op.note):"Préstamo registrado"):op.payment?.affectBalance?"Con movimiento en Transacciones":"Registro documental"}</p></div><div class="loan-history-values"><strong class="${op.kind==="payment"?"paid":""}">${op.kind==="payment"?"−":""}${money(op.amount)}</strong><small>Saldo: ${money(op.balance)}</small></div></article>`).join("")}</div>`;
+}
+function openLoanDetail(key){
+  const group=loanEntityGroups(countryItems(state.loans)).find(x=>x.key===key),modal=$("#loanDetailModal"),card=$("#loanDetailCard");if(!group||!modal||!card)return;
+  card.innerHTML=renderLoanDetail(group);modal.classList.remove("hidden");document.body.classList.add("modal-open");$("[data-close-loan-detail]",modal)?.focus();
+  const close=()=>{modal.classList.add("hidden");document.body.classList.remove("modal-open")};
+  $("[data-close-loan-detail]",modal).onclick=close;modal.onclick=e=>{if(e.target===modal)close()};modal.onkeydown=e=>{if(e.key==="Escape")close()};
+}
 function renderLoans(){
-  const items=countryItems(state.loans);
+  const items=countryItems(state.loans),groups=loanEntityGroups(items);
   return `${pageHead("Préstamos",`Dinero que debemos y dinero que nos deben.`,`<button class="button" data-add="loan">+ Nuevo préstamo</button>`)}
-  <div class="loan-grid">${items.length?items.map(x=>`<article class="panel budget-card"><div class="budget-top"><div><small class="muted">${x.direction==="owed"?"DINERO QUE DEBEMOS":"DINERO QUE NOS DEBEN"}</small><h3>${escapeHtml(x.person)}</h3>${x.note?`<p class="loan-description">${escapeHtml(x.note)}</p>`:""}</div><div class="row-actions"><button data-edit="loan" data-id="${x.id}">✎</button><button data-delete="loan" data-id="${x.id}">⌫</button></div></div><div class="metric-value">${money(x.balance)}</div><small class="muted">De ${money(x.amount)} · ${dateLabel(x.date)}</small><div class="form-actions"><button class="button ghost" data-pay="${x.id}">Registrar abono</button></div></article>`).join(""):empty("Sin préstamos activos","Registra una obligación o cuenta por cobrar.")}</div>`;
+  ${groups.length?`<section class="loan-summary-section"><div class="loan-section-head"><div><h3>Resumen por persona o entidad</h3><p class="muted">Selecciona una tarjeta para ver la operación, los abonos y el saldo restante.</p></div></div><div class="loan-summary-grid">${groups.map(group=>`<button type="button" class="panel loan-summary-card" data-loan-summary="${escapeAttr(group.key)}"><div class="loan-summary-top"><div><small>${group.direction==="owed"?"DEBEMOS":"NOS DEBEN"}</small><h3>${escapeHtml(group.person)}</h3></div><span aria-hidden="true">›</span></div><strong class="loan-summary-balance">${money(group.balance)}</strong><span class="loan-summary-label">Saldo pendiente</span><div class="loan-summary-meta"><span>Original <b>${money(group.amount)}</b></span><span>Abonado <b>${money(group.paid)}</b></span></div><small>${group.loans.length} ${group.loans.length===1?"operación":"operaciones"}</small></button>`).join("")}</div></section>`:""}
+  <div class="loan-grid">${items.length?items.map(x=>`<article class="panel budget-card"><div class="budget-top"><div><small class="muted">${x.direction==="owed"?"DINERO QUE DEBEMOS":"DINERO QUE NOS DEBEN"}</small><h3>${escapeHtml(x.person)}</h3>${x.note?`<p class="loan-description">${escapeHtml(x.note)}</p>`:""}</div><div class="row-actions"><button data-edit="loan" data-id="${x.id}">✎</button><button data-delete="loan" data-id="${x.id}">⌫</button></div></div><div class="metric-value">${money(x.balance)}</div><small class="muted">De ${money(x.amount)} · ${dateLabel(x.date)}</small><div class="form-actions"><button class="button ghost" data-pay="${x.id}">Registrar abono</button></div></article>`).join(""):empty("Sin préstamos activos","Registra una obligación o cuenta por cobrar.")}</div>${loanDetailModal()}`;
 }
 function renderRecurrings(){
   const items=countryItems(state.recurrings);
@@ -498,7 +535,8 @@ function bindPage(){
   $$("[data-edit]").forEach(b=>b.onclick=()=>openForm(b.dataset.edit,b.dataset.id));
   $$("[data-delete]").forEach(b=>b.onclick=()=>askDelete(b.dataset.delete,b.dataset.id));
   $$("[data-go]").forEach(b=>b.onclick=()=>{currentPage=b.dataset.go;render()});
-  $$("[data-pay]").forEach(b=>b.onclick=()=>payLoan(b.dataset.pay));
+  $("[data-pay]").forEach(b=>b.onclick=()=>payLoan(b.dataset.pay));
+  $("[data-loan-summary]").forEach(b=>b.onclick=()=>openLoanDetail(b.dataset.loanSummary));
   $$("[data-recurring-check]").forEach(input=>input.onchange=()=>{
     setRecurringChecked(input.dataset.recurringCheck,input.checked);
     render();
@@ -653,12 +691,12 @@ function createLoanCashTransaction({loan,amount,date,stage}){
   const label=isOpening
     ?(cashIn?"Préstamo recibido":"Dinero prestado")
     :(cashIn?"Abono recibido":"Abono pagado");
-  state.transactions.push({
+  const transaction={
     id:uid("t"),country:loan.country,type:"ajuste",amount:Math.abs(Number(amount)||0),
     cashEffect:(cashIn?1:-1)*Math.abs(Number(amount)||0),
     category:"Préstamos y deudas",description:`${label} · ${loan.person}`,date,
     loanId:loan.id,loanStage:stage,updatedAt:new Date().toISOString()
-  });
+  };state.transactions.push(transaction);return transaction;
 }
 $("#recordForm").onsubmit=e=>{
   e.preventDefault();
@@ -667,7 +705,9 @@ $("#recordForm").onsubmit=e=>{
     const loan=state.loans.find(x=>x.id===id),value=Number(data.amount);
     if(!loan||!value||value<=0||value>Number(loan.balance)){toast("Ingresa un abono válido, sin superar el saldo pendiente");return}
     loan.balance=Number(loan.balance)-value;loan.updatedAt=new Date().toISOString();
-    if(data.affectBalance==="yes")createLoanCashTransaction({loan,amount:value,date:data.date,stage:"payment"});
+    const transaction=data.affectBalance==="yes"?createLoanCashTransaction({loan,amount:value,date:data.date,stage:"payment"}):null;
+    if(!Array.isArray(loan.payments))loan.payments=[];
+    loan.payments.push({id:uid("lp"),amount:value,date:data.date,affectBalance:data.affectBalance==="yes",transactionId:transaction?.id||null,createdAt:new Date().toISOString()});
     saveState();closeForm();render();toast(data.affectBalance==="yes"?"Abono y transacción registrados":"Abono registrado sin afectar el saldo");return;
   }
   const collection={transaction:"transactions",budget:"budgets",transfer:"transfers",loan:"loans",recurring:"recurrings"}[kind];
