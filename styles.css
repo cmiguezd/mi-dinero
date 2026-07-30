@@ -868,3 +868,82 @@ body[data-country="CO"] .info-notice>span{color:#211b00}
 .category-action-message span{font-size:12px}
 @media(max-width:780px){.category-manager-head{align-items:stretch;flex-direction:column}.category-manager-actions{width:100%}.category-manager-actions .button{flex:1}.category-add{width:100%;max-width:none}.category-manager-list{grid-template-columns:1fr}}
 @media(max-width:520px){.category-add{flex-direction:column}.category-add .button{width:100%}.category-manager-modal{padding:19px}.category-manager-row{padding:10px}}
+
+
+/* Préstamos: opción de movimiento de caja y abonos integrados */
+.form-check{
+  display:flex;
+  align-items:flex-start;
+  gap:11px;
+  padding:13px 14px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--panel2);
+  cursor:pointer;
+}
+.form-check input{
+  position:absolute;
+  width:1px;
+  height:1px;
+  opacity:0;
+  pointer-events:none;
+}
+.form-check>span{
+  display:grid;
+  place-items:center;
+  flex:0 0 22px;
+  width:22px;
+  height:22px;
+  border:1px solid var(--line);
+  border-radius:7px;
+  background:var(--panel);
+  color:transparent;
+  font-size:13px;
+  font-weight:800;
+  transition:background .18s,border-color .18s,color .18s,box-shadow .18s;
+}
+.form-check input:checked+span{
+  border-color:var(--accent);
+  background:var(--accent);
+  color:#fff;
+  box-shadow:0 0 0 4px var(--accent-soft);
+}
+.form-check input:focus-visible+span{
+  outline:2px solid color-mix(in srgb,var(--accent) 60%,transparent);
+  outline-offset:2px;
+}
+.form-check>div{
+  display:grid;
+  gap:3px;
+}
+.form-check strong{
+  color:var(--text);
+  font-size:13px;
+}
+.form-check small{
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.45;
+}
+.loan-payment-summary{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  margin-bottom:16px;
+  padding:12px 14px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--panel2);
+}
+.loan-payment-summary span{
+  color:var(--muted);
+  font-size:12px;
+}
+.loan-payment-summary strong{
+  color:var(--text);
+  font-size:13px;
+}
+@media(max-width:560px){
+  .loan-payment-summary{align-items:flex-start;flex-direction:column;gap:4px}
+}
