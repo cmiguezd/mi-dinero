@@ -947,3 +947,5 @@ body[data-country="CO"] .info-notice>span{color:#211b00}
 @media(max-width:560px){
   .loan-payment-summary{align-items:flex-start;flex-direction:column;gap:4px}
 }
+
+.loan-description{margin:4px 0 0;max-width:36ch;color:var(--muted);font-size:.78rem;line-height:1.35;overflow-wrap:anywhere}
