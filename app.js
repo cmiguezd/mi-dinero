@@ -196,7 +196,10 @@ function merchantGroups(tx=dashboardTransactions({ignoreMerchant:true})){
     const key=merchantKey(label),current=map.get(key)||{key,label,count:0,amount:0};
     current.count+=1;current.amount+=Number(x.amount||0);map.set(key,current);
   });
-  return [...map.values()]\n    .sort((a,b)=>b.count-a.count||b.amount-a.amount||a.label.localeCompare(b.label,"es"))\n    .slice(0,10)\n    .sort((a,b)=>b.amount-a.amount||b.count-a.count||a.label.localeCompare(b.label,"es"));
+  return [...map.values()]
+    .sort((a,b)=>b.count-a.count||b.amount-a.amount||a.label.localeCompare(b.label,"es"))
+    .slice(0,10)
+    .sort((a,b)=>b.amount-a.amount||b.count-a.count||a.label.localeCompare(b.label,"es"));
 }
 function isFlexibleCategory(category=""){
   return /(restaur|comida|aliment|mercado|compra|entreten|ocio|viaje|belleza|hormiga|transporte|delivery|ropa|regalo|suscrip)/i.test(category);
