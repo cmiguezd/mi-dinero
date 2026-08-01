@@ -1,11 +1,10 @@
 const STORAGE_KEY = "mi-dinero-v3";
 const PERIOD_KEY = "mi-dinero-global-period";
 const THEME_KEY = "mi-dinero-theme";
-const RECURRING_CHECKS_KEY = "mi-dinero-recurring-checks";
 const LOAN_SETTLED_FILTER_KEY = "mi-dinero-hide-settled-loans";
 const blankState = () => ({
   version: 3, country: "CN",
-  transactions: [], budgets: [], transfers: [], loans: [], recurrings: [],
+  transactions: [], budgets: [], transfers: [], loans: [], recurrings: [], recurringChecks: {},
   settings: { user: "Carlos", email: "Cuenta local", dataSource: "Este dispositivo" }
 });
 let state = loadState();
@@ -29,12 +28,30 @@ const pageNames={resumen:"Resumen",transacciones:"Transacciones",presupuestos:"P
 
 function initialState(){return window.MI_DINERO_INITIAL_DATA?structuredClone(window.MI_DINERO_INITIAL_DATA):blankState()}
 function loadState(){try{const saved=localStorage.getItem(STORAGE_KEY);return saved?{...blankState(),...JSON.parse(saved)}:initialState()}catch{return initialState()}}
-function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state));window.MiDineroCloud?.queueSave(state)}
+async function saveState(previousState){
+  const cloud=window.MiDineroCloud;
+  try{
+    if(!cloud?.configured())throw new Error("Configura Google Sheets antes de guardar registros.");
+    await cloud.push(structuredClone(state));
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+    return true;
+  }catch(error){
+    if(previousState)state=previousState;
+    const message=cloud?.friendlyError?.(error)||error?.message||"No se pudo guardar en Google Sheets";
+    toast(`No se guardó: ${message}`);
+    return false;
+  }
+}
 function uid(prefix="r"){return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2,8)}`}
 function money(value,country=state.country){return new Intl.NumberFormat(meta[country].locale,{style:"currency",currency:meta[country].currency,maximumFractionDigits:country==="CO"?0:2}).format(Number(value)||0)}
 function dateLabel(date){if(!date)return "";return new Intl.DateTimeFormat("es",{day:"2-digit",month:"short",year:"numeric",timeZone:"UTC"}).format(new Date(`${date}T12:00:00Z`))}
 function today(){return new Date().toISOString().slice(0,10)}
 function toast(text){const el=$("#toast");el.textContent=text;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),2400)}
+function setButtonBusy(button,busy,label="Guardando…"){
+  if(!button)return;
+  if(busy){button.dataset.originalText=button.textContent;button.textContent=label;button.disabled=true;button.setAttribute("aria-busy","true")}
+  else{button.textContent=button.dataset.originalText||button.textContent;button.disabled=false;button.removeAttribute("aria-busy");delete button.dataset.originalText}
+}
 function countryItems(arr){return arr.filter(x=>x.country===state.country)}
 function categoryRegistry(){
   if(!Array.isArray(state.categories)){
@@ -51,28 +68,31 @@ function availableCategories(){
   return [...new Set([...categoryRegistry(),...assigned])].sort((a,b)=>a.localeCompare(b,"es"));
 }
 function categoryUsage(name){return state.transactions.filter(x=>x.category===name).length}
-function addCategory(){
+async function addCategory(){
   const input=$("#newCategoryName"),name=input?.value.trim().replace(/\s+/g," ");
   if(!name){toast("Escribe el nombre de la categoría");return}
   if(availableCategories().some(x=>x.localeCompare(name,"es",{sensitivity:"accent"})===0)){toast("La categoría ya existe");return}
+  const previousState=structuredClone(state);
   categoryRegistry().push(name);categoryRegistry().sort((a,b)=>a.localeCompare(b,"es"));
-  saveState();render();toast("Categoría agregada para ambos países");
+  if(await saveState(previousState)){render();toast("Categoría guardada en Google Sheets")}
 }
-function applyCategoryRename(oldName,name){
+async function applyCategoryRename(oldName,name){
   name=name.trim().replace(/\s+/g," ");
   if(!name){toast("El nombre no puede quedar vacío");return false}
   if(name!==oldName&&availableCategories().some(x=>x.localeCompare(name,"es",{sensitivity:"accent"})===0)){toast("Ya existe una categoría con ese nombre");return false}
+  const previousState=structuredClone(state);
   state.categories=categoryRegistry().map(x=>x===oldName?name:x);
   ["transactions","budgets","recurrings"].forEach(collection=>{
     state[collection]=state[collection].map(x=>x.category===oldName?{...x,category:name,updatedAt:new Date().toISOString()}:x);
   });
   if(dashboardCategory===oldName)dashboardCategory=name;
-  saveState();render();toast("Categoría actualizada en ambos países");
-  return true;
+  if(await saveState(previousState)){render();toast("Categoría actualizada en Google Sheets");return true}
+  return false;
 }
-function removeCategory(name){
+async function removeCategory(name){
+  const previousState=structuredClone(state);
   state.categories=categoryRegistry().filter(x=>x!==name);
-  saveState();render();toast("Categoría eliminada");
+  if(await saveState(previousState)){render();toast("Categoría eliminada de Google Sheets")}
 }
 function openCategoryActionDialog(mode,name){
   const modal=$("#categoryActionModal"),card=$("#categoryActionCard");
@@ -97,30 +117,28 @@ function openCategoryActionDialog(mode,name){
   modal.onclick=e=>{if(e.target===modal)close()};
   modal.onkeydown=e=>{if(e.key==="Escape"){e.stopPropagation();close()}};
   const form=$("#categoryRenameForm",card);
-  if(form)form.onsubmit=e=>{e.preventDefault();applyCategoryRename(name,$("#categoryRenameInput",card).value)};
+  if(form)form.onsubmit=async e=>{e.preventDefault();const button=form.querySelector('[type="submit"]');setButtonBusy(button,true);const saved=await applyCategoryRename(name,$("#categoryRenameInput",card).value);if(!saved)setButtonBusy(button,false)};
   const confirm=$("#confirmCategoryDelete",card);
-  if(confirm)confirm.onclick=()=>removeCategory(name);
+  if(confirm)confirm.onclick=async()=>{setButtonBusy(confirm,true,"Eliminando…");await removeCategory(name);if(document.body.contains(confirm))setButtonBusy(confirm,false)};
 }
 function pageHead(title,description,action=""){return `<div class="page-head"><div><h2>${title}</h2><p>${description}</p></div>${action}</div>`}
 function empty(title,text){return `<div class="empty"><div><strong>${title}</strong>${text}</div></div>`}
 function savePeriod(){localStorage.setItem(PERIOD_KEY,JSON.stringify({year:dashboardYear,month:dashboardMonth}))}
-function recurringChecks(){
-  try{return JSON.parse(localStorage.getItem(RECURRING_CHECKS_KEY)||"{}")}catch{return {}}
-}
+function recurringChecks(){return state.recurringChecks||{}}
 function isRecurringChecked(id){
   return Boolean(recurringChecks()[state.country]?.[id]);
 }
 function setRecurringChecked(id,checked){
-  const saved=recurringChecks();
+  const saved=structuredClone(recurringChecks());
   saved[state.country]={...(saved[state.country]||{})};
   if(checked)saved[state.country][id]=true;
   else delete saved[state.country][id];
-  localStorage.setItem(RECURRING_CHECKS_KEY,JSON.stringify(saved));
+  state.recurringChecks=saved;
 }
 function clearRecurringChecks(){
-  const saved=recurringChecks();
+  const saved=structuredClone(recurringChecks());
   delete saved[state.country];
-  localStorage.setItem(RECURRING_CHECKS_KEY,JSON.stringify(saved));
+  state.recurringChecks=saved;
 }
 function applyTheme(theme=colorTheme){
   colorTheme=theme==="light"?"light":"dark";
@@ -527,7 +545,7 @@ function renderRecurrings(){
   return `${pageHead("Pagos recurrentes",`Recordatorios de gastos e ingresos periódicos.`,actions)}
   <div class="panel table-panel">${items.length?`<div class="recurring-check-summary"><span><strong>${checkedCount}</strong> de ${items.length} pagados</span><small>Marca cada recurrente cuando quede listo.</small></div><div class="transaction-list recurring-list">${items.map(x=>{const checked=isRecurringChecked(x.id);return `<div class="transaction-row recurring-row ${checked?"is-paid":""}" data-recurring-row="${x.id}"><label class="recurring-check" title="${checked?"Marcar como pendiente":"Marcar como pagado"}"><input type="checkbox" data-recurring-check="${x.id}" ${checked?"checked":""} aria-label="${checked?"Marcar como pendiente":"Marcar como pagado"}: ${escapeAttr(x.description)}"><span aria-hidden="true">✓</span></label><div class="tx-icon">↻</div><div><strong>${escapeHtml(x.description)}</strong><small>${escapeHtml(x.frequency)} · Próximo: día ${x.day}</small></div><span class="amount ${x.type}">${money(x.amount)}</span><div class="row-actions"><button data-edit="recurring" data-id="${x.id}">✎</button><button data-delete="recurring" data-id="${x.id}">⌫</button></div></div>`}).join("")}</div>`:empty("Sin pagos recurrentes","Agrega recordatorios; no crean transacciones automáticamente.")}</div>`;
 }
-function renderSettings(){const cloud=window.MiDineroCloud,connected=cloud?.isConnected(),status=window.miDineroCloudStatus?.text||"Falta configurar Google OAuth";const categories=availableCategories();return `${pageHead("Configuración","Administra categorías, apariencia, sincronización y copias de seguridad.")}
+function renderSettings(){const cloud=window.MiDineroCloud,connected=cloud?.isConnected(),migrationPending=cloud?.localMigrationPending?.(),status=window.miDineroCloudStatus?.text||"Falta configurar Google OAuth";const categories=availableCategories();return `${pageHead("Configuración","Administra categorías, apariencia, sincronización y copias de seguridad.")}
   <div class="panel category-manager-panel">
     <div class="category-manager-head"><div><h3>Categorías compartidas</h3><p class="muted">Un solo catálogo para China y Colombia.</p></div><div class="category-manager-actions"><button type="button" class="button" id="showAddCategory">+ Agregar</button><button type="button" class="button ghost" id="openCategoryManager">Editar</button></div></div>
     <div class="category-add hidden" id="categoryAddForm"><input class="input" id="newCategoryName" maxlength="60" placeholder="Nombre de la nueva categoría"><button type="button" class="button" id="addCategory">Guardar</button><button type="button" class="button ghost" id="cancelAddCategory">Cancelar</button></div>
@@ -542,9 +560,9 @@ function renderSettings(){const cloud=window.MiDineroCloud,connected=cloud?.isCo
       </div>
     </div>
   </div>
-  <div class="settings-grid"><div class="panel appearance-panel"><h3>Apariencia</h3><p class="muted">Elige cómo quieres ver la aplicación en este dispositivo.</p><div class="theme-selector" role="group" aria-label="Modo de apariencia"><button type="button" data-theme-option="light" class="${colorTheme==="light"?"active":""}" aria-pressed="${colorTheme==="light"}"><span aria-hidden="true">☀</span><strong>Modo día</strong><small>Fondo claro</small></button><button type="button" data-theme-option="dark" class="${colorTheme==="dark"?"active":""}" aria-pressed="${colorTheme==="dark"}"><span aria-hidden="true">☾</span><strong>Modo noche</strong><small>Fondo oscuro</small></button></div></div><div class="panel"><h3>Cuenta</h3><div class="settings-row"><span>Nombre</span><strong>${escapeHtml(state.settings.user)}</strong></div><div class="settings-row"><span>Almacenamiento</span><strong>${connected?"Google Sheets + dispositivo":"Este dispositivo"}</strong></div><div class="cloud-status" id="cloudStatus">${escapeHtml(status)}</div><div class="form-actions" style="justify-content:flex-start">${connected?`<button class="button" id="syncNow">Sincronizar ahora</button><button class="button ghost" id="disconnectGoogle">Desconectar</button>`:`<button class="button" id="connectGoogle">Conectar Google Sheets</button>`}</div></div>
+  <div class="settings-grid"><div class="panel appearance-panel"><h3>Apariencia</h3><p class="muted">Elige cómo quieres ver la aplicación en este dispositivo.</p><div class="theme-selector" role="group" aria-label="Modo de apariencia"><button type="button" data-theme-option="light" class="${colorTheme==="light"?"active":""}" aria-pressed="${colorTheme==="light"}"><span aria-hidden="true">☀</span><strong>Modo día</strong><small>Fondo claro</small></button><button type="button" data-theme-option="dark" class="${colorTheme==="dark"?"active":""}" aria-pressed="${colorTheme==="dark"}"><span aria-hidden="true">☾</span><strong>Modo noche</strong><small>Fondo oscuro</small></button></div></div><div class="panel"><h3>Cuenta</h3><div class="settings-row"><span>Nombre</span><strong>${escapeHtml(state.settings.user)}</strong></div><div class="settings-row"><span>Almacenamiento</span><strong>Google Sheets obligatorio</strong></div><div class="cloud-status" id="cloudStatus">${escapeHtml(status)}</div><div class="form-actions" style="justify-content:flex-start">${connected?`<button class="button" id="syncNow">${migrationPending?"Subir datos de este dispositivo":"Sincronizar ahora"}</button><button class="button ghost" id="disconnectGoogle">Desconectar</button>`:`<button class="button" id="connectGoogle">${migrationPending?"Conectar y proteger mis datos":"Conectar Google Sheets"}</button>`}</div></div>
   <div class="panel private-config-panel"><div class="private-config-head"><div><span class="private-config-kicker">Acceso y sincronización</span><h3>Configuración privada</h3></div><span class="private-config-badge" aria-label="Valores ocultos por defecto">Protegida</span></div><p class="muted private-config-intro">Los identificadores se ocultan para evitar que otras personas los vean en tu pantalla. Los permisos de Google Sheets continúan siendo la protección real de tus datos.</p><div class="private-config-fields"><div class="field"><label for="googleClientId">Google OAuth Client ID</label><div class="secret-input-wrap"><input class="input secret-input" type="password" id="googleClientId" value="${escapeAttr(window.MI_DINERO_CLOUD_CONFIG?.clientId||"")}" placeholder="...apps.googleusercontent.com" autocomplete="off" spellcheck="false"><button type="button" class="secret-toggle" data-secret-toggle="googleClientId" aria-label="Mostrar Google OAuth Client ID" aria-pressed="false"><span class="secret-toggle-icon" aria-hidden="true">◉</span><span class="secret-toggle-label">Mostrar</span></button></div><small class="field-help">Identifica la aplicación ante Google; no es una contraseña.</small></div><div class="field"><label for="googleSheetId">ID del Google Sheet</label><div class="secret-input-wrap"><input class="input secret-input" type="password" id="googleSheetId" value="${escapeAttr(window.MI_DINERO_CLOUD_CONFIG?.spreadsheetId||"")}" placeholder="Identificador del archivo maestro" autocomplete="off" spellcheck="false"><button type="button" class="secret-toggle" data-secret-toggle="googleSheetId" aria-label="Mostrar ID del Google Sheet" aria-pressed="false"><span class="secret-toggle-icon" aria-hidden="true">◉</span><span class="secret-toggle-label">Mostrar</span></button></div><small class="field-help">Solo las cuentas autorizadas en Google pueden acceder al archivo.</small></div></div><div class="private-config-footer"><span class="private-config-note"><span aria-hidden="true">●</span> Se guardan en este navegador al pulsar el botón.</span><button class="button" id="saveCloudConfig">Guardar configuración</button></div></div>
-  <div class="panel"><h3>Respaldos</h3><p class="muted">Descarga un respaldo completo o importa uno anterior.</p><div class="form-actions" style="justify-content:flex-start"><button class="button" id="exportData">Exportar respaldo</button><label class="button ghost" for="importData">Importar respaldo</label><input class="file-input" type="file" id="importData" accept=".json"></div><div class="settings-row"><span>Reiniciar aplicación</span><button class="button danger" id="resetData">Borrar datos locales</button></div></div></div>`}
+  <div class="panel"><h3>Respaldos</h3><p class="muted">Descarga un respaldo completo o importa uno anterior.</p><div class="form-actions" style="justify-content:flex-start"><button class="button" id="exportData">Exportar respaldo</button><label class="button ghost" for="importData">Importar respaldo</label><input class="file-input" type="file" id="importData" accept=".json"></div><div class="settings-row"><span>Reiniciar aplicación</span><button class="button danger" id="resetData">Borrar todos los datos</button></div></div></div>`}
 
 function bindPage(){
   $$("[data-add]").forEach(b=>b.onclick=()=>openForm(b.dataset.add));
@@ -559,17 +577,20 @@ function bindPage(){
     card.onclick=open;
     card.onkeydown=e=>{if((e.key==="Enter"||e.key===" ")&&!e.target.closest("button, a, input, select, textarea")){e.preventDefault();openLoanDetail(card.dataset.loanKey,card.dataset.loanDetail)}};
   });
-  $$("[data-recurring-check]").forEach(input=>input.onchange=()=>{
-    setRecurringChecked(input.dataset.recurringCheck,input.checked);
-    render();
-    toast(input.checked?"Recurrente marcado como pagado":"Recurrente marcado como pendiente");
+  $$("[data-recurring-check]").forEach(input=>input.onchange=async()=>{
+    const previousState=structuredClone(state),checked=input.checked;
+    input.disabled=true;
+    setRecurringChecked(input.dataset.recurringCheck,checked);
+    if(await saveState(previousState)){render();toast(checked?"Recurrente guardado como pagado":"Recurrente guardado como pendiente")}
+    else{input.checked=!checked;input.disabled=false}
   });
   const clearRecurring=$("[data-clear-recurring-checks]");
-  if(clearRecurring)clearRecurring.onclick=()=>{
+  if(clearRecurring)clearRecurring.onclick=async()=>{
     const marked=countryItems(state.recurrings).filter(x=>isRecurringChecked(x.id)).length;
     if(!marked)return;
     if(window.confirm(`¿Limpiar ${marked} check${marked===1?"":"s"} de ${meta[state.country].name}?`)){
-      clearRecurringChecks();render();toast("Checks reiniciados");
+      const previousState=structuredClone(state);setButtonBusy(clearRecurring,true);clearRecurringChecks();
+      if(await saveState(previousState)){render();toast("Checks reiniciados en Google Sheets")}else setButtonBusy(clearRecurring,false);
     }
   };
   const search=$("#searchTx"),typeFilter=$("#typeFilter"),categoryFilter=$("#categoryFilter");if(search)search.oninput=filterTransactions;if(typeFilter)typeFilter.onchange=filterTransactions;if(categoryFilter)categoryFilter.onchange=filterTransactions;const exportTransactionsButton=$("#exportTransactions");if(exportTransactionsButton)exportTransactionsButton.onclick=exportVisibleTransactions;
@@ -643,13 +664,13 @@ function bindPage(){
   const closeCategoryManager=()=>{categoryManagerModal?.classList.add("hidden");document.body.classList.remove("modal-open");$("#openCategoryManager")?.focus()};
   if($("#closeCategoryManager"))$("#closeCategoryManager").onclick=closeCategoryManager;
   if(categoryManagerModal)categoryManagerModal.onclick=e=>{if(e.target===categoryManagerModal)closeCategoryManager()};
-  if($("#addCategory"))$("#addCategory").onclick=addCategory;
+  if($("#addCategory"))$("#addCategory").onclick=async e=>{setButtonBusy(e.currentTarget,true);await addCategory();if(document.body.contains(e.currentTarget))setButtonBusy(e.currentTarget,false)};
   if($("#newCategoryName"))$("#newCategoryName").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();addCategory()}};
   document.querySelectorAll("[data-category-rename]").forEach(button=>button.onclick=()=>openCategoryActionDialog("rename",button.dataset.categoryRename));
   document.querySelectorAll("[data-category-delete]").forEach(button=>button.onclick=()=>openCategoryActionDialog("delete",button.dataset.categoryDelete));
   if(categoryManagerModal)categoryManagerModal.onkeydown=e=>{if(e.key==="Escape"&&$("#categoryActionModal")?.classList.contains("hidden"))closeCategoryManager()};
   if($("#exportData"))$("#exportData").onclick=exportData;if($("#importData"))$("#importData").onchange=importData;if($("#resetData"))$("#resetData").onclick=()=>askDelete("all","all");
-  if($("#connectGoogle"))$("#connectGoogle").onclick=()=>window.MiDineroCloud?.connect();if($("#disconnectGoogle"))$("#disconnectGoogle").onclick=()=>window.MiDineroCloud?.disconnect();if($("#syncNow"))$("#syncNow").onclick=()=>window.MiDineroCloud?.pull();if($("#saveCloudConfig"))$("#saveCloudConfig").onclick=saveCloudConfig;
+  if($("#connectGoogle"))$("#connectGoogle").onclick=()=>window.MiDineroCloud?.connect();if($("#disconnectGoogle"))$("#disconnectGoogle").onclick=()=>window.MiDineroCloud?.disconnect();if($("#syncNow"))$("#syncNow").onclick=()=>window.MiDineroCloud?.localMigrationPending?.()?window.MiDineroCloud.migrateLocal():window.MiDineroCloud?.pull();if($("#saveCloudConfig"))$("#saveCloudConfig").onclick=saveCloudConfig;
   [...document.querySelectorAll("[data-secret-toggle]")].forEach(button=>{button.onclick=()=>{const input=document.getElementById(button.dataset.secretToggle);if(!input)return;const reveal=input.type==="password";input.type=reveal?"text":"password";button.setAttribute("aria-pressed",String(reveal));button.setAttribute("aria-label",`${reveal?"Ocultar":"Mostrar"} ${input.id==="googleClientId"?"Google OAuth Client ID":"ID del Google Sheet"}`);const label=$(".secret-toggle-label",button);if(label)label.textContent=reveal?"Ocultar":"Mostrar";}});
 }
 function filterTransactions(){
@@ -736,8 +757,9 @@ function createLoanCashTransaction({loan,amount,date,stage}){
     loanId:loan.id,loanStage:stage,updatedAt:new Date().toISOString()
   };state.transactions.push(transaction);return transaction;
 }
-$("#recordForm").onsubmit=e=>{
+$("#recordForm").onsubmit=async e=>{
   e.preventDefault();
+  const form=e.currentTarget,submitButton=form.querySelector('[type="submit"]'),previousState=structuredClone(state);
   const kind=e.currentTarget.dataset.kind,id=e.currentTarget.dataset.id,data=Object.fromEntries(new FormData(e.currentTarget));
   if(kind==="loanPayment"){
     const loan=state.loans.find(x=>x.id===id),value=Number(data.amount);
@@ -746,7 +768,10 @@ $("#recordForm").onsubmit=e=>{
     const transaction=data.affectBalance==="yes"?createLoanCashTransaction({loan,amount:value,date:data.date,stage:"payment"}):null;
     if(!Array.isArray(loan.payments))loan.payments=[];
     loan.payments.push({id:uid("lp"),amount:value,date:data.date,affectBalance:data.affectBalance==="yes",transactionId:transaction?.id||null,createdAt:new Date().toISOString()});
-    saveState();closeForm();render();toast(data.affectBalance==="yes"?"Abono y transacción registrados":"Abono registrado sin afectar el saldo");return;
+    setButtonBusy(submitButton,true);
+    if(await saveState(previousState)){closeForm();render();toast(data.affectBalance==="yes"?"Abono y transacción guardados en Google Sheets":"Abono guardado en Google Sheets")}
+    else setButtonBusy(submitButton,false);
+    return;
   }
   const collection={transaction:"transactions",budget:"budgets",transfer:"transfers",loan:"loans",recurring:"recurrings"}[kind];
   ["amount","sent","received","fee","balance","day"].forEach(k=>{if(k in data)data[k]=Number(data[k])});
@@ -756,11 +781,13 @@ $("#recordForm").onsubmit=e=>{
   const record={...data,id:id||uid(kind[0]),country:kind==="transfer"?undefined:state.country,updatedAt:new Date().toISOString()};
   if(id)state[collection]=state[collection].map(x=>x.id===id?{...x,...record}:x);
   else{state[collection].push(record);if(kind==="loan"&&affectBalance)createLoanCashTransaction({loan:record,amount:record.amount,date:record.date,stage:"opening"});}
-  saveState();closeForm();render();toast(kind==="loan"&&affectBalance?"Préstamo y transacción registrados":id?"Registro actualizado":"Registro guardado");
+  setButtonBusy(submitButton,true);
+  if(await saveState(previousState)){closeForm();render();toast(kind==="loan"&&affectBalance?"Préstamo y transacción guardados en Google Sheets":id?"Registro actualizado en Google Sheets":"Registro guardado en Google Sheets")}
+  else setButtonBusy(submitButton,false);
 };
-function askDelete(kind,id){pendingDelete={kind,id};let label="este registro";if(kind!=="all"){const collection={transaction:"transactions",budget:"budgets",transfer:"transfers",loan:"loans",recurring:"recurrings"}[kind];const x=state[collection].find(i=>i.id===id);label=x?.description||x?.category||x?.person||"este registro"}$("#confirmText").textContent=kind==="all"?"Se eliminarán todos los datos guardados en este dispositivo.":`Se eliminará “${label}”. Esta acción no se puede deshacer.`;$("#confirmModal").classList.remove("hidden")}
+function askDelete(kind,id){pendingDelete={kind,id};let label="este registro";if(kind!=="all"){const collection={transaction:"transactions",budget:"budgets",transfer:"transfers",loan:"loans",recurring:"recurrings"}[kind];const x=state[collection].find(i=>i.id===id);label=x?.description||x?.category||x?.person||"este registro"}$("#confirmText").textContent=kind==="all"?"Se eliminarán todos los datos de la aplicación en Google Sheets.":`Se eliminará “${label}” de Google Sheets. Esta acción no se puede deshacer.`;$("#confirmModal").classList.remove("hidden")}
 $("[data-cancel]").onclick=()=>{$("#confirmModal").classList.add("hidden");pendingDelete=null};
-$("#confirmDelete").onclick=()=>{if(!pendingDelete)return;if(pendingDelete.kind==="all")state=blankState();else{const collection={transaction:"transactions",budget:"budgets",transfer:"transfers",loan:"loans",recurring:"recurrings"}[pendingDelete.kind];state[collection]=state[collection].filter(x=>x.id!==pendingDelete.id)}saveState();$("#confirmModal").classList.add("hidden");pendingDelete=null;render();toast("Registro eliminado")};
+$("#confirmDelete").onclick=async e=>{if(!pendingDelete)return;const previousState=structuredClone(state),deleteRequest={...pendingDelete};if(deleteRequest.kind==="all")state=blankState();else{const collection={transaction:"transactions",budget:"budgets",transfer:"transfers",loan:"loans",recurring:"recurrings"}[deleteRequest.kind];state[collection]=state[collection].filter(x=>x.id!==deleteRequest.id)}setButtonBusy(e.currentTarget,true,"Eliminando…");if(await saveState(previousState)){$("#confirmModal").classList.add("hidden");pendingDelete=null;render();toast("Registro eliminado de Google Sheets")}else setButtonBusy(e.currentTarget,false)};
 function payLoan(id){
   const loan=state.loans.find(x=>x.id===id);if(!loan)return;
   $("#modalEyebrow").textContent="PRÉSTAMO";$("#modalTitle").textContent="Registrar abono";
@@ -769,14 +796,14 @@ function payLoan(id){
 }
 function exportData(){const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`mi-dinero-respaldo-${today()}.json`;a.click();URL.revokeObjectURL(a.href);toast("Respaldo exportado")}
 function saveCloudConfig(){const clientId=$("#googleClientId").value.trim(),spreadsheetId=$("#googleSheetId").value.trim();if(!clientId.endsWith(".apps.googleusercontent.com")||!spreadsheetId){toast("Revisa el Client ID y el Sheet ID");return}localStorage.setItem("mi-dinero-cloud-config",JSON.stringify({clientId,spreadsheetId,sheetName:"_AppState"}));toast("Configuración guardada; recargando…");setTimeout(()=>location.reload(),700)}
-function importData(e){const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{try{const imported=JSON.parse(reader.result);if(!imported.transactions||!imported.version)throw Error();state={...blankState(),...imported};saveState();render();toast("Respaldo importado")}catch{toast("El archivo no es un respaldo válido")}};reader.readAsText(file)}
+function importData(e){const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=async()=>{const previousState=structuredClone(state);try{const imported=JSON.parse(reader.result);if(!imported.transactions||!imported.version)throw Error();state={...blankState(),...imported};if(await saveState(previousState)){render();toast("Respaldo importado en Google Sheets")}}catch{state=previousState;toast("El archivo no es un respaldo válido")}};reader.readAsText(file)}
 function escapeHtml(v=""){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
 function escapeAttr(v=""){return escapeHtml(v)}
 
 $("#nav").onclick=e=>{const b=e.target.closest("[data-page]");if(!b)return;currentPage=b.dataset.page;$("#sidebar").classList.remove("open");render()};
-$("#countrySwitch").onclick=e=>{const b=e.target.closest("[data-country]");if(!b)return;state.country=b.dataset.country;saveState();render()};
+$("#countrySwitch").onclick=e=>{const b=e.target.closest("[data-country]");if(!b)return;state.country=b.dataset.country;localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render()};
 $("#menuButton").onclick=()=>$("#sidebar").classList.toggle("open");
-$("#refreshButton").onclick=()=>{if(window.MiDineroCloud?.isConnected())window.MiDineroCloud.pull();else{state=loadState();render();toast("Datos actualizados")}};
+$("#refreshButton").onclick=()=>{const cloud=window.MiDineroCloud;if(!cloud?.isConnected()){toast("Conecta Google Sheets para actualizar los datos");return}if(cloud.localMigrationPending?.()){cloud.migrateLocal();return}cloud.pull()};
 window.miDineroGetState=()=>structuredClone(state);
 window.miDineroApplyState=next=>{state={...blankState(),...next};localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();toast("Datos sincronizados")};
 window.miDineroRefresh=render;

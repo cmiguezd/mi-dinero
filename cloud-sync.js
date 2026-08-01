@@ -1,12 +1,14 @@
 (() => {
   const config = window.MI_DINERO_CLOUD_CONFIG || {};
   const TOKEN_KEY = "mi-dinero-google-token";
+  const LOCAL_STATE_KEY = "mi-dinero-v3";
+  const LOCAL_MIGRATION_KEY = "mi-dinero-cloud-migration-v1";
   let tokenClient = null;
-  let saveTimer = null;
   let syncing = false;
 
   const configured = () => Boolean(config.clientId && config.spreadsheetId);
   const getToken = () => sessionStorage.getItem(TOKEN_KEY) || "";
+  const localMigrationPending = () => Boolean(localStorage.getItem(LOCAL_STATE_KEY)) && localStorage.getItem(LOCAL_MIGRATION_KEY) !== "complete";
   const setStatus = (text, tone = "") => {
     window.miDineroCloudStatus = { text, tone };
     const el = document.querySelector("#cloudStatus");
@@ -108,7 +110,12 @@
   }
 
   const range = () => `/values/${encodeURIComponent(`${config.sheetName}!A1:A`)}`;
-  async function pull() {
+  async function pull({ allowOverwriteLocal = false } = {}) {
+    if (localMigrationPending() && !allowOverwriteLocal) {
+      const error = new Error("Hay datos de este dispositivo pendientes de subir. Conecta Google para guardarlos antes de descargar la nube.");
+      setStatus(error.message, "error");
+      throw error;
+    }
     if (syncing) return;
     syncing = true;
     setStatus("Sincronizando…");
@@ -134,7 +141,17 @@
   }
 
   async function push(nextState = window.miDineroGetState?.()) {
-    if (!nextState || !getToken() || syncing) return;
+    if (!nextState) throw new Error("No hay datos para guardar en Google Sheets");
+    if (!configured()) {
+      const error = new Error("La conexión con Google aún no está configurada.");
+      setStatus(error.message, "error");
+      throw error;
+    }
+    if (syncing) {
+      const error = new Error("Hay otra sincronización en curso. Espera un momento y vuelve a intentar.");
+      setStatus(error.message, "error");
+      throw error;
+    }
     syncing = true;
     setStatus("Guardando en Google Sheets…");
     try {
@@ -147,21 +164,25 @@
         body: JSON.stringify({ range: writeRange, majorDimension: "COLUMNS", values: [["MI_DINERO_STATE_V1", new Date().toISOString(), ...chunks]] })
       });
       localStorage.setItem("mi-dinero-last-sync", new Date().toISOString());
-      setStatus("Cambios guardados", "ok");
+      localStorage.setItem(LOCAL_MIGRATION_KEY, "complete");
+      setStatus("Guardado en Google Sheets", "ok");
+      return true;
+    } catch (error) {
+      console.error("Google Sheets save:", error);
+      setStatus(friendlyError(error), "error");
+      throw error;
     } finally { syncing = false; }
-  }
-
-  function queueSave(nextState) {
-    if (!getToken()) return;
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => push(nextState).catch(error => setStatus(friendlyError(error), "error")), 900);
   }
 
   async function connect() {
     try {
       setStatus("Conectando con Google…");
       await requestToken("consent select_account");
-      await pull();
+      if (localMigrationPending()) {
+        await migrateLocal();
+      } else {
+        await pull();
+      }
       window.miDineroRefresh?.();
     } catch (error) {
       console.error("Google OAuth:", error);
@@ -169,14 +190,23 @@
     }
   }
 
+  async function migrateLocal() {
+    if (!localMigrationPending()) return pull();
+    setStatus("Protegiendo y subiendo los datos de este dispositivo…");
+    await push(window.miDineroGetState?.());
+    setStatus("Datos de este dispositivo guardados en Google Sheets", "ok");
+    window.miDineroRefresh?.();
+    return true;
+  }
+
   function disconnect() {
     const current = getToken();
     if (current && window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(current);
     sessionStorage.removeItem(TOKEN_KEY);
-    setStatus("Datos guardados solo en este dispositivo");
+    setStatus("Desconectado: conecta Google para guardar registros", "error");
     window.miDineroRefresh?.();
   }
 
-  window.MiDineroCloud = { configured, connect, disconnect, pull, push, queueSave, isConnected: () => Boolean(getToken()) };
-  setStatus(configured() ? (getToken() ? "Conectado; pulsa sincronizar" : "Listo para conectar con Google") : "Falta configurar Google OAuth");
+  window.MiDineroCloud = { configured, connect, disconnect, pull, push, migrateLocal, localMigrationPending, isConnected: () => Boolean(getToken()), friendlyError };
+  setStatus(configured() ? (localMigrationPending() ? "Datos de este dispositivo pendientes de subir a Google Sheets" : getToken() ? "Conectado; pulsa sincronizar" : "Listo para conectar con Google") : "Falta configurar Google OAuth");
 })();
