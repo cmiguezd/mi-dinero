@@ -196,8 +196,12 @@ body[data-country="CO"] .labeled-bar .bar-value,body[data-country="CO"] .labeled
 }
 .balance-flow-item strong{
   margin:9px 0 4px;
-  font-size:26px;
+  font-size:clamp(18px,1.3vw,26px);
   line-height:1.1;
+  letter-spacing:-.035em;
+  font-variant-numeric:tabular-nums;
+  overflow:visible;
+  text-overflow:clip;
 }
 .balance-flow-item small{
   font-size:11px;
@@ -217,7 +221,7 @@ body[data-country="CO"] .labeled-bar .bar-value,body[data-country="CO"] .labeled
     border-top:3px solid var(--accent);
   }
   .balance-flow-item:last-child{
-    grid-column:1/-1;
+    grid-column:auto;
   }
 }
 @media(max-width:650px){
