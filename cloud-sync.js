@@ -150,6 +150,7 @@
 
   async function pull({ silent = false, initial = false } = {}) {
     if (syncing) return false;
+    let recurringChecksMigration = null;
     syncing = true;
     if (!silent) setStatus("Consultando Google Sheets…");
     try {
@@ -162,6 +163,7 @@
       const remote = JSON.parse(values.slice(2).join(""));
       const remoteVersion = values[1] || remote.cloud?.updatedAt || new Date().toISOString();
       window.miDineroApplyState(remote, { silent: silent || initial });
+      recurringChecksMigration = window.miDineroGetPendingRecurringChecksMigration?.() || null;
       rememberRemoteVersion(remoteVersion);
       setStatus(initial ? "Última versión cargada desde Google Sheets" : silent ? "Datos al día" : "Actualizado desde Google Sheets", "ok");
       if (initial) setBootState("ready");
@@ -175,6 +177,17 @@
       return false;
     } finally {
       syncing = false;
+      if (recurringChecksMigration) {
+        window.setTimeout(async () => {
+          try {
+            await push(recurringChecksMigration);
+            window.miDineroCompleteRecurringChecksMigration?.();
+            setStatus("Checks anteriores recuperados y guardados en Google Sheets", "ok");
+          } catch (error) {
+            console.error("Recurring checks migration:", error);
+          }
+        }, 0);
+      }
     }
   }
 
