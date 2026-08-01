@@ -11,7 +11,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260801-39">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="styles.css?v=20260801-40">
 </head>
 <body>
   <div class="cloud-gate" id="cloudGate" role="status" aria-live="polite">
@@ -27,13 +28,13 @@
     <aside class="sidebar" id="sidebar">
       <div class="brand"><span class="brand-mark">$</span><span>Mi Dinero</span></div>
       <nav id="nav">
-        <button class="nav-item active" data-page="resumen"><span>⌂</span>Resumen</button>
-        <button class="nav-item" data-page="transacciones"><span>↕</span>Transacciones</button>
-        <button class="nav-item" data-page="presupuestos"><span>◎</span>Presupuestos</button>
-        <button class="nav-item" data-page="transferencias"><span>⇄</span>Transferencias</button>
-        <button class="nav-item" data-page="prestamos"><span>◇</span>Préstamos</button>
-        <button class="nav-item" data-page="recurrentes"><span>↻</span>Recurrentes</button>
-        <button class="nav-item" data-page="configuracion"><span>⚙</span>Configuración</button>
+        <button class="nav-item active" data-page="resumen"><span><i class="bi bi-house-door" aria-hidden="true"></i></span>Resumen</button>
+        <button class="nav-item" data-page="transacciones"><span><i class="bi bi-arrow-down-up" aria-hidden="true"></i></span>Transacciones</button>
+        <button class="nav-item" data-page="presupuestos"><span><i class="bi bi-pie-chart" aria-hidden="true"></i></span>Presupuestos</button>
+        <button class="nav-item" data-page="transferencias"><span><i class="bi bi-arrow-left-right" aria-hidden="true"></i></span>Transferencias</button>
+        <button class="nav-item" data-page="prestamos"><span><i class="bi bi-cash-coin" aria-hidden="true"></i></span>Préstamos</button>
+        <button class="nav-item" data-page="recurrentes"><span><i class="bi bi-arrow-repeat" aria-hidden="true"></i></span>Recurrentes</button>
+        <button class="nav-item" data-page="configuracion"><span><i class="bi bi-gear" aria-hidden="true"></i></span>Configuración</button>
       </nav>
       <div class="sidebar-footer">
         <div class="avatar">CM</div>
@@ -43,7 +44,7 @@
 
     <main>
       <header class="topbar">
-        <button class="icon-button menu-button" id="menuButton" aria-label="Abrir menú">☰</button>
+        <button class="icon-button menu-button" id="menuButton" aria-label="Abrir menú"><i class="bi bi-list" aria-hidden="true"></i></button>
         <div>
           <p class="eyebrow">FINANZAS PERSONALES</p>
           <h1 id="pageTitle">Resumen</h1>
@@ -79,7 +80,7 @@
             </button>
             </div>
           </div>
-          <button class="icon-button" id="refreshButton" title="Actualizar">↻</button>
+          <button class="icon-button" id="refreshButton" title="Actualizar" aria-label="Actualizar"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i></button>
         </div>
       </header>
       <section id="content"></section>
@@ -88,14 +89,14 @@
 
   <div class="modal-backdrop hidden" id="modal">
     <div class="modal-card">
-      <div class="modal-head"><div><p class="eyebrow" id="modalEyebrow">NUEVO</p><h2 id="modalTitle">Registro</h2></div><button class="icon-button" data-close>×</button></div>
+      <div class="modal-head"><div><p class="eyebrow" id="modalEyebrow">NUEVO</p><h2 id="modalTitle">Registro</h2></div><button class="icon-button" data-close aria-label="Cerrar"><i class="bi bi-x-lg" aria-hidden="true"></i></button></div>
       <form id="recordForm"></form>
     </div>
   </div>
 
   <div class="modal-backdrop hidden" id="confirmModal">
     <div class="confirm-card">
-      <div class="danger-icon">!</div>
+      <div class="danger-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></div>
       <h2>Eliminar registro</h2>
       <p id="confirmText">Esta acción no se puede deshacer.</p>
       <div class="form-actions"><button class="button ghost" data-cancel>Cancelar</button><button class="button danger" id="confirmDelete">Eliminar</button></div>
@@ -104,7 +105,7 @@
   <div class="toast" id="toast"></div>
   <script src="initial-data.js"></script>
   <script src="cloud-config.js"></script>
-  <script src="app.js?v=20260731-53"></script>
+  <script src="app.js?v=20260801-54"></script>
   <script src="cloud-sync.js?v=20260731-5"></script>
 </body>
 </html>
