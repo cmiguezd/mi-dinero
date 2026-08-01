@@ -3,18 +3,43 @@
   const TOKEN_KEY = "mi-dinero-google-token";
   const LOCAL_STATE_KEY = "mi-dinero-v3";
   const LOCAL_MIGRATION_KEY = "mi-dinero-cloud-migration-v1";
+  const LAST_SYNC_KEY = "mi-dinero-last-sync";
+  const POLL_INTERVAL_MS = 10000;
   let tokenClient = null;
   let syncing = false;
+  let pollTimer = null;
+  let lastRemoteVersion = localStorage.getItem(LAST_SYNC_KEY) || "";
 
   const configured = () => Boolean(config.clientId && config.spreadsheetId);
   const getToken = () => sessionStorage.getItem(TOKEN_KEY) || "";
   const localMigrationPending = () => Boolean(localStorage.getItem(LOCAL_STATE_KEY)) && localStorage.getItem(LOCAL_MIGRATION_KEY) !== "complete";
+
   const setStatus = (text, tone = "") => {
     window.miDineroCloudStatus = { text, tone };
-    const el = document.querySelector("#cloudStatus");
-    if (el) {
-      el.textContent = text;
-      el.dataset.tone = tone;
+    const settingsStatus = document.querySelector("#cloudStatus");
+    if (settingsStatus) {
+      settingsStatus.textContent = text;
+      settingsStatus.dataset.tone = tone;
+    }
+    const liveStatus = document.querySelector("#liveSyncStatus");
+    if (liveStatus) {
+      const copy = liveStatus.querySelector(".live-sync-copy");
+      if (copy) copy.textContent = text;
+      liveStatus.dataset.tone = tone;
+      liveStatus.title = text;
+    }
+  };
+
+  const setBootState = (mode, message = "") => {
+    document.documentElement.dataset.cloudBoot = mode;
+    const title = document.querySelector("#cloudGateTitle");
+    const status = document.querySelector("#cloudGateStatus");
+    const button = document.querySelector("#cloudGateConnect");
+    if (title) title.textContent = mode === "auth" ? "Accede a tu información" : mode === "error" ? "No pudimos cargar tus datos" : "Cargando tu información";
+    if (status && message) status.textContent = message;
+    if (button) {
+      button.classList.toggle("hidden", !["auth", "error"].includes(mode));
+      button.textContent = mode === "error" ? "Reintentar" : "Continuar con Google";
     }
   };
 
@@ -26,9 +51,10 @@
     if (/access_denied/i.test(code)) return "Google rechazó el acceso. Entra con carlosmiguez13@gmail.com y acepta los permisos.";
     if (/invalid_client|origin|redirect_uri_mismatch/i.test(`${code} ${description}`)) return "Google no reconoce este Client ID u origen. Revisa que el cliente sea de tipo Aplicación web y autorice https://cmiguezd.github.io";
     if (/idpiframe_initialization_failed|third.party|cookies/i.test(`${code} ${description}`)) return "El navegador bloqueó las cookies necesarias de Google. Permítelas para accounts.google.com y vuelve a intentar.";
-    if (/timeout|tiempo de espera|abort/i.test(`${code} ${description}`)) return "Google Sheets tardó demasiado en responder. Revisa la conexión y vuelve a pulsar Sincronizar.";
+    if (/timeout|tiempo de espera|abort/i.test(`${code} ${description}`)) return "Google Sheets tardó demasiado en responder. Revisa la conexión y vuelve a intentar.";
     if (/403|PERMISSION_DENIED|insufficientPermissions/i.test(`${code} ${description}`)) return "Google autorizó la cuenta, pero no permitió modificar este archivo. Verifica que carlosmiguez13@gmail.com sea editor del Sheet y vuelve a conectar.";
     if (/404|NOT_FOUND|Requested entity was not found/i.test(`${code} ${description}`)) return "No se encontró el Google Sheet configurado. Revisa el ID del archivo en Configuración privada.";
+    if (/REMOTE_CONFLICT/i.test(code)) return "Google Sheets cambió en otro dispositivo. Ya estamos cargando esa versión; repite la acción cuando termine.";
     return `Error de Google: ${description || code || "no identificado"}`;
   }
 
@@ -109,32 +135,44 @@
     });
   }
 
-  const range = () => `/values/${encodeURIComponent(`${config.sheetName}!A1:A`)}`;
-  async function pull({ allowOverwriteLocal = false } = {}) {
-    if (localMigrationPending() && !allowOverwriteLocal) {
-      const error = new Error("Hay datos de este dispositivo pendientes de subir. Conecta Google para guardarlos antes de descargar la nube.");
-      setStatus(error.message, "error");
-      throw error;
-    }
-    if (syncing) return;
+  const stateRange = () => `/values/${encodeURIComponent(`${config.sheetName}!A1:A`)}`;
+  const versionRange = () => `/values/${encodeURIComponent(`${config.sheetName}!A1:A2`)}`;
+
+  function rememberRemoteVersion(version) {
+    lastRemoteVersion = version || new Date().toISOString();
+    localStorage.setItem(LAST_SYNC_KEY, lastRemoteVersion);
+    localStorage.setItem(LOCAL_MIGRATION_KEY, "complete");
+  }
+
+  function hasBlockingDialog() {
+    return Boolean(document.querySelector(".modal-backdrop:not(.hidden)"));
+  }
+
+  async function pull({ silent = false, initial = false } = {}) {
+    if (syncing) return false;
     syncing = true;
-    setStatus("Sincronizando…");
+    if (!silent) setStatus("Consultando Google Sheets…");
     try {
       await ensureSheet();
-      const result = await api(`${range()}?majorDimension=COLUMNS`);
+      const result = await api(`${stateRange()}?majorDimension=COLUMNS`);
       const values = result.values?.[0] || [];
       if (!values.length || values[0] !== "MI_DINERO_STATE_V1") {
-        syncing = false;
-        await push();
-        return;
+        throw new Error("Google Sheets todavía no contiene un estado válido de Mi Dinero.");
       }
       const remote = JSON.parse(values.slice(2).join(""));
-      window.miDineroApplyState(remote);
-      localStorage.setItem("mi-dinero-last-sync", new Date().toISOString());
-      setStatus("Sincronizado con Google Sheets", "ok");
+      const remoteVersion = values[1] || remote.cloud?.updatedAt || new Date().toISOString();
+      window.miDineroApplyState(remote, { silent: silent || initial });
+      rememberRemoteVersion(remoteVersion);
+      setStatus(initial ? "Última versión cargada desde Google Sheets" : silent ? "Datos al día" : "Actualizado desde Google Sheets", "ok");
+      if (initial) setBootState("ready");
+      startAutoSync();
+      return true;
     } catch (error) {
       console.error("Google Sheets sync:", error);
-      setStatus(friendlyError(error), "error");
+      const message = friendlyError(error);
+      setStatus(message, "error");
+      if (initial) setBootState("error", message);
+      return false;
     } finally {
       syncing = false;
     }
@@ -147,66 +185,141 @@
       setStatus(error.message, "error");
       throw error;
     }
+    if (!getToken()) {
+      const error = new Error("Tu sesión de Google no está activa. Vuelve a conectar antes de guardar.");
+      setStatus(error.message, "error");
+      setBootState("auth", "Inicia sesión para guardar y consultar la última versión de Google Sheets.");
+      throw error;
+    }
     if (syncing) {
       const error = new Error("Hay otra sincronización en curso. Espera un momento y vuelve a intentar.");
       setStatus(error.message, "error");
       throw error;
     }
+    let remoteConflict = false;
     syncing = true;
     setStatus("Guardando en Google Sheets…");
     try {
       await ensureSheet();
-      const payload = JSON.stringify({ ...nextState, cloud: { updatedAt: new Date().toISOString() } });
+      const current = await api(`${stateRange()}?majorDimension=COLUMNS`);
+      const currentValues = current.values?.[0] || [];
+      const currentVersion = currentValues[0] === "MI_DINERO_STATE_V1" ? currentValues[1] || "" : "";
+      if (lastRemoteVersion && currentVersion && currentVersion !== lastRemoteVersion) {
+        remoteConflict = true;
+        const conflict = new Error("REMOTE_CONFLICT");
+        conflict.code = "REMOTE_CONFLICT";
+        throw conflict;
+      }
+      const writtenAt = new Date().toISOString();
+      const payload = JSON.stringify({ ...nextState, cloud: { updatedAt: writtenAt } });
       const chunks = payload.match(/.{1,45000}/gs) || [payload];
-      const writeRange = `${config.sheetName}!A1:A${chunks.length + 2}`;
+      const columnValues = ["MI_DINERO_STATE_V1", writtenAt, ...chunks];
+      while (columnValues.length < currentValues.length) columnValues.push("");
+      const writeRange = `${config.sheetName}!A1:A${columnValues.length}`;
       await api(`/values/${encodeURIComponent(writeRange)}?valueInputOption=RAW`, {
         method: "PUT",
-        body: JSON.stringify({ range: writeRange, majorDimension: "COLUMNS", values: [["MI_DINERO_STATE_V1", new Date().toISOString(), ...chunks]] })
+        body: JSON.stringify({ range: writeRange, majorDimension: "COLUMNS", values: [columnValues] })
       });
-      localStorage.setItem("mi-dinero-last-sync", new Date().toISOString());
-      localStorage.setItem(LOCAL_MIGRATION_KEY, "complete");
+      rememberRemoteVersion(writtenAt);
       setStatus("Guardado en Google Sheets", "ok");
+      startAutoSync();
       return true;
     } catch (error) {
       console.error("Google Sheets save:", error);
       setStatus(friendlyError(error), "error");
       throw error;
-    } finally { syncing = false; }
+    } finally {
+      syncing = false;
+      if (remoteConflict) window.setTimeout(() => pull({ silent: true }), 0);
+    }
+  }
+
+  async function checkForUpdates() {
+    if (!configured() || !getToken() || syncing || document.hidden || hasBlockingDialog()) return;
+    try {
+      const result = await api(`${versionRange()}?majorDimension=COLUMNS`);
+      const values = result.values?.[0] || [];
+      const remoteVersion = values[0] === "MI_DINERO_STATE_V1" ? values[1] || "" : "";
+      if (!remoteVersion) return;
+      if (!lastRemoteVersion) {
+        lastRemoteVersion = remoteVersion;
+        return;
+      }
+      if (remoteVersion !== lastRemoteVersion) await pull({ silent: true });
+    } catch (error) {
+      console.error("Google Sheets live sync:", error);
+      setStatus(friendlyError(error), "error");
+    }
+  }
+
+  function startAutoSync() {
+    if (pollTimer || !getToken()) return;
+    pollTimer = window.setInterval(checkForUpdates, POLL_INTERVAL_MS);
+  }
+
+  function stopAutoSync() {
+    if (pollTimer) window.clearInterval(pollTimer);
+    pollTimer = null;
   }
 
   async function connect() {
     try {
+      setBootState("loading", "Iniciando sesión y consultando la última versión de Google Sheets…");
       setStatus("Conectando con Google…");
       await requestToken("consent select_account");
-      if (localMigrationPending()) {
-        await migrateLocal();
-      } else {
-        await pull();
-      }
+      await pull({ initial: true });
       window.miDineroRefresh?.();
     } catch (error) {
       console.error("Google OAuth:", error);
-      setStatus(configured() ? friendlyError(error) : "Falta configurar Google OAuth", "error");
+      const message = configured() ? friendlyError(error) : "Falta configurar Google OAuth";
+      setStatus(message, "error");
+      setBootState("error", message);
     }
   }
 
   async function migrateLocal() {
-    if (!localMigrationPending()) return pull();
-    setStatus("Protegiendo y subiendo los datos de este dispositivo…");
-    await push(window.miDineroGetState?.());
-    setStatus("Datos de este dispositivo guardados en Google Sheets", "ok");
-    window.miDineroRefresh?.();
-    return true;
+    throw new Error("La migración inicial ya terminó. Google Sheets es ahora la única copia oficial.");
+  }
+
+  function showLogin() {
+    setBootState("auth", "Inicia sesión para cargar la última versión guardada en Google Sheets.");
   }
 
   function disconnect() {
     const current = getToken();
     if (current && window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(current);
     sessionStorage.removeItem(TOKEN_KEY);
-    setStatus("Desconectado: conecta Google para guardar registros", "error");
+    stopAutoSync();
+    setStatus("Desconectado de Google Sheets", "error");
+    showLogin();
     window.miDineroRefresh?.();
   }
 
-  window.MiDineroCloud = { configured, connect, disconnect, pull, push, migrateLocal, localMigrationPending, isConnected: () => Boolean(getToken()), friendlyError };
-  setStatus(configured() ? (localMigrationPending() ? "Datos de este dispositivo pendientes de subir a Google Sheets" : getToken() ? "Conectado; pulsa sincronizar" : "Listo para conectar con Google") : "Falta configurar Google OAuth");
+  async function bootstrap() {
+    const gateButton = document.querySelector("#cloudGateConnect");
+    if (gateButton) gateButton.onclick = () => connect();
+    window.addEventListener("focus", checkForUpdates);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) checkForUpdates();
+    });
+    if (!configured()) {
+      setStatus("Falta configurar Google OAuth", "error");
+      setBootState("ready");
+      return;
+    }
+    if (!getToken()) {
+      setStatus("Inicia sesión para cargar Google Sheets");
+      showLogin();
+      return;
+    }
+    setBootState("loading", "Consultando la última versión guardada en Google Sheets…");
+    await pull({ initial: true });
+  }
+
+  window.MiDineroCloud = {
+    configured, connect, disconnect, pull, push, migrateLocal, localMigrationPending,
+    isConnected: () => Boolean(getToken()), friendlyError, checkForUpdates, showLogin
+  };
+  setStatus(configured() ? getToken() ? "Conectando con Google Sheets…" : "Inicia sesión para cargar Google Sheets" : "Falta configurar Google OAuth");
+  bootstrap();
 })();
