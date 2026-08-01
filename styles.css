@@ -1164,3 +1164,17 @@ html:not([data-cloud-boot="ready"]) .app-shell{visibility:hidden}
 .live-sync-status[data-tone="error"]>span:first-child{background:var(--red);box-shadow:0 0 0 3px color-mix(in srgb,var(--red) 14%,transparent)}
 @media(max-width:900px){.live-sync-status{order:2}.live-sync-copy{display:none}.live-sync-status{width:34px;justify-content:center;padding:0}}
 @media(max-width:560px){.cloud-gate-card{padding:28px 22px}.cloud-gate-card h1{font-size:22px}}
+
+
+/* Sistema unificado de iconos — Bootstrap Icons */
+.bi{display:inline-block;line-height:1;vertical-align:-.125em}
+.button{gap:8px}
+.button>.bi{font-size:1em}
+.icon-button>.bi,.row-actions .bi,.loan-history-actions .bi{font-size:15px;pointer-events:none}
+.nav-item>span .bi{font-size:17px}
+.tx-icon .bi{font-size:15px}
+.theme-selector .bi{font-size:18px}
+.loan-filter-check .bi,.form-check>span .bi,.recurring-check>span .bi{font-size:12px}
+.loan-summary-top>span .bi,.loan-history-link .bi{font-size:15px}
+.danger-icon .bi{font-size:18px}
+.info-notice>span .bi{font-size:14px}
