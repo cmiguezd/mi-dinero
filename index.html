@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es" data-theme="dark">
+<html lang="es" data-theme="dark" data-cloud-boot="loading">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,9 +11,18 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260730-36">
+  <link rel="stylesheet" href="styles.css?v=20260731-37">
 </head>
 <body>
+  <div class="cloud-gate" id="cloudGate" role="status" aria-live="polite">
+    <div class="cloud-gate-card">
+      <span class="cloud-gate-mark" aria-hidden="true">$</span>
+      <p class="eyebrow">MI DINERO</p>
+      <h1 id="cloudGateTitle">Cargando tu información</h1>
+      <p id="cloudGateStatus">Consultando la última versión guardada en Google Sheets…</p>
+      <button type="button" class="button hidden" id="cloudGateConnect">Continuar con Google</button>
+    </div>
+  </div>
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
       <div class="brand"><span class="brand-mark">$</span><span>Mi Dinero</span></div>
@@ -40,6 +49,9 @@
           <h1 id="pageTitle">Resumen</h1>
         </div>
         <div class="top-actions">
+          <div class="live-sync-status" id="liveSyncStatus" data-tone="">
+            <span aria-hidden="true"></span><span class="live-sync-copy">Conectando…</span>
+          </div>
           <div id="globalPeriodSlot"></div>
           <div class="header-control country-control">
             <span class="header-control-label">País</span>
@@ -92,7 +104,7 @@
   <div class="toast" id="toast"></div>
   <script src="initial-data.js"></script>
   <script src="cloud-config.js"></script>
-  <script src="app.js?v=20260731-50"></script>
-  <script src="cloud-sync.js?v=20260731-3"></script>
+  <script src="app.js?v=20260731-51"></script>
+  <script src="cloud-sync.js?v=20260731-4"></script>
 </body>
 </html>
