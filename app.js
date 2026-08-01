@@ -1,6 +1,8 @@
 const STORAGE_KEY = "mi-dinero-v3";
 const PERIOD_KEY = "mi-dinero-global-period";
 const THEME_KEY = "mi-dinero-theme";
+const LEGACY_RECURRING_CHECKS_KEY = "mi-dinero-recurring-checks";
+const RECURRING_CHECKS_MIGRATION_KEY = "mi-dinero-recurring-checks-migrated-v1";
 const LOAN_SETTLED_FILTER_KEY = "mi-dinero-hide-settled-loans";
 const blankState = () => ({
   version: 3, country: "CN",
@@ -11,6 +13,7 @@ let state = loadState();
 let currentPage = "resumen";
 let colorTheme = localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark";
 let pendingDelete = null;
+let pendingLegacyRecurringChecksMigration = false;
 let hideSettledLoans = localStorage.getItem(LOAN_SETTLED_FILTER_KEY) !== "false";
 const savedPeriod = (()=>{try{return JSON.parse(localStorage.getItem(PERIOD_KEY)||"{}")}catch{return {}}})();
 let dashboardYear = savedPeriod.year||"";
@@ -124,6 +127,31 @@ function openCategoryActionDialog(mode,name){
 function pageHead(title,description,action=""){return `<div class="page-head"><div><h2>${title}</h2><p>${description}</p></div>${action}</div>`}
 function empty(title,text){return `<div class="empty"><div><strong>${title}</strong>${text}</div></div>`}
 function savePeriod(){localStorage.setItem(PERIOD_KEY,JSON.stringify({year:dashboardYear,month:dashboardMonth}))}
+function storedLegacyRecurringChecks(){
+  if(localStorage.getItem(RECURRING_CHECKS_MIGRATION_KEY)==="complete")return {};
+  try{
+    const saved=JSON.parse(localStorage.getItem(LEGACY_RECURRING_CHECKS_KEY)||"{}");
+    return saved&&typeof saved==="object"?saved:{};
+  }catch{return {}}
+}
+function checkedRecurringCount(checks={}){
+  return ["CN","CO"].reduce((total,country)=>total+Object.values(checks[country]||{}).filter(Boolean).length,0);
+}
+function restoreLegacyRecurringChecks(next){
+  const legacy=storedLegacyRecurringChecks();
+  if(!checkedRecurringCount(legacy))return next;
+  const current=next?.recurringChecks&&typeof next.recurringChecks==="object"?structuredClone(next.recurringChecks):{};
+  let restored=false;
+  ["CN","CO"].forEach(country=>{
+    if(!Object.values(current[country]||{}).some(Boolean)&&Object.values(legacy[country]||{}).some(Boolean)){
+      current[country]=structuredClone(legacy[country]);
+      restored=true;
+    }
+  });
+  if(!restored)return next;
+  pendingLegacyRecurringChecksMigration=true;
+  return {...next,recurringChecks:current};
+}
 function recurringChecks(){return state.recurringChecks||{}}
 function isRecurringChecked(id){
   return Boolean(recurringChecks()[state.country]?.[id]);
@@ -541,9 +569,9 @@ function renderRecurrings(){
   const totalRecurring=items.reduce((sum,x)=>sum+(Number(x.amount)||0),0);
   const totalPending=items.filter(x=>!isRecurringChecked(x.id)).reduce((sum,x)=>sum+(Number(x.amount)||0),0);
   const recurringTotals=`<div class="recurring-total-cards" aria-label="Resumen de pagos recurrentes"><div><span>Total recurrentes</span><strong>${money(totalRecurring)}</strong></div><div class="pending"><span>Pendientes</span><strong>${money(totalPending)}</strong></div></div>`;
-  const actions=`<div class="page-head-actions recurring-page-actions">${recurringTotals}<div class="recurring-action-buttons"><button class="button ghost" type="button" data-clear-recurring-checks ${checkedCount?"":"disabled"}>Limpiar checks</button><button class="button" data-add="recurring">+ Nuevo recurrente</button></div></div>`;
+  const actions=`<div class="page-head-actions recurring-page-actions">${recurringTotals}<div class="recurring-action-buttons"><button class="button ghost" type="button" data-clear-recurring-checks ${checkedCount?"":"disabled"}>Reiniciar manualmente</button><button class="button" data-add="recurring">+ Nuevo recurrente</button></div></div>`;
   return `${pageHead("Pagos recurrentes",`Recordatorios de gastos e ingresos periódicos.`,actions)}
-  <div class="panel table-panel">${items.length?`<div class="recurring-check-summary"><span><strong>${checkedCount}</strong> de ${items.length} pagados</span><small>Marca cada recurrente cuando quede listo.</small></div><div class="transaction-list recurring-list">${items.map(x=>{const checked=isRecurringChecked(x.id);return `<div class="transaction-row recurring-row ${checked?"is-paid":""}" data-recurring-row="${x.id}"><label class="recurring-check" title="${checked?"Marcar como pendiente":"Marcar como pagado"}"><input type="checkbox" data-recurring-check="${x.id}" ${checked?"checked":""} aria-label="${checked?"Marcar como pendiente":"Marcar como pagado"}: ${escapeAttr(x.description)}"><span aria-hidden="true">✓</span></label><div class="tx-icon">↻</div><div><strong>${escapeHtml(x.description)}</strong><small>${escapeHtml(x.frequency)} · Próximo: día ${x.day}</small></div><span class="amount ${x.type}">${money(x.amount)}</span><div class="row-actions"><button data-edit="recurring" data-id="${x.id}">✎</button><button data-delete="recurring" data-id="${x.id}">⌫</button></div></div>`}).join("")}</div>`:empty("Sin pagos recurrentes","Agrega recordatorios; no crean transacciones automáticamente.")}</div>`;
+  <div class="panel table-panel">${items.length?`<div class="recurring-check-summary"><span><strong>${checkedCount}</strong> de ${items.length} pagados</span><small>Estado manual: el día de referencia nunca cambia los checks.</small></div><div class="transaction-list recurring-list">${items.map(x=>{const checked=isRecurringChecked(x.id);return `<div class="transaction-row recurring-row ${checked?"is-paid":""}" data-recurring-row="${x.id}"><label class="recurring-check" title="${checked?"Marcar como pendiente":"Marcar como pagado"}"><input type="checkbox" data-recurring-check="${x.id}" ${checked?"checked":""} aria-label="${checked?"Marcar como pendiente":"Marcar como pagado"}: ${escapeAttr(x.description)}"><span aria-hidden="true">✓</span></label><div class="tx-icon">↻</div><div><strong>${escapeHtml(x.description)}</strong><small>${escapeHtml(x.frequency)} · Día de referencia: ${x.day}</small></div><span class="amount ${x.type}">${money(x.amount)}</span><div class="row-actions"><button data-edit="recurring" data-id="${x.id}">✎</button><button data-delete="recurring" data-id="${x.id}">⌫</button></div></div>`}).join("")}</div>`:empty("Sin pagos recurrentes","Agrega recordatorios; no crean transacciones automáticamente.")}</div>`;
 }
 function renderSettings(){const cloud=window.MiDineroCloud,connected=cloud?.isConnected(),status=window.miDineroCloudStatus?.text||"Falta configurar Google OAuth";const categories=availableCategories();return `${pageHead("Configuración","Administra categorías, apariencia, sincronización y copias de seguridad.")}
   <div class="panel category-manager-panel">
@@ -588,7 +616,7 @@ function bindPage(){
   if(clearRecurring)clearRecurring.onclick=async()=>{
     const marked=countryItems(state.recurrings).filter(x=>isRecurringChecked(x.id)).length;
     if(!marked)return;
-    if(window.confirm(`¿Limpiar ${marked} check${marked===1?"":"s"} de ${meta[state.country].name}?`)){
+    if(window.confirm(`¿Reiniciar manualmente ${marked} check${marked===1?"":"s"} de ${meta[state.country].name}? Solo esta acción los marcará como pendientes.`)){
       const previousState=structuredClone(state);setButtonBusy(clearRecurring,true);clearRecurringChecks();
       if(await saveState(previousState)){render();toast("Checks reiniciados en Google Sheets")}else setButtonBusy(clearRecurring,false);
     }
@@ -805,6 +833,12 @@ $("#countrySwitch").onclick=e=>{const b=e.target.closest("[data-country]");if(!b
 $("#menuButton").onclick=()=>$("#sidebar").classList.toggle("open");
 $("#refreshButton").onclick=()=>{const cloud=window.MiDineroCloud;if(!cloud?.isConnected()){toast("Conecta Google Sheets para actualizar los datos");cloud?.showLogin?.();return}cloud.pull()};
 window.miDineroGetState=()=>structuredClone(state);
-window.miDineroApplyState=(next,{silent=false}={})=>{state={...blankState(),...next};localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();if(!silent)toast("Datos sincronizados desde Google Sheets")};
+window.miDineroApplyState=(next,{silent=false}={})=>{state={...blankState(),...restoreLegacyRecurringChecks(next)};localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();if(!silent)toast("Datos sincronizados desde Google Sheets")};
+window.miDineroGetPendingRecurringChecksMigration=()=>pendingLegacyRecurringChecksMigration?structuredClone(state):null;
+window.miDineroCompleteRecurringChecksMigration=()=>{
+  pendingLegacyRecurringChecksMigration=false;
+  localStorage.setItem(RECURRING_CHECKS_MIGRATION_KEY,"complete");
+  localStorage.removeItem(LEGACY_RECURRING_CHECKS_KEY);
+};
 window.miDineroRefresh=render;
 render();
