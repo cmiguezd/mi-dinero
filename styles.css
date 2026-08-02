@@ -1178,3 +1178,140 @@ html:not([data-cloud-boot="ready"]) .app-shell{visibility:hidden}
 .loan-summary-top>span .bi,.loan-history-link .bi{font-size:15px}
 .danger-icon .bi{font-size:18px}
 .info-notice>span .bi{font-size:14px}
+
+
+/* Correcciones responsive exclusivas para teléfono */
+@media(max-width:700px){
+  html,body{width:100%;max-width:100%;overflow-x:hidden}
+  .app-shell,main,.topbar,#content,.page-head,.page-head>div,.page-head-actions,
+  .panel,.table-panel,.transaction-list,.transaction-row,.loan-summary-section,
+  .loan-summary-grid,.loan-summary-card,.loan-grid,.loan-card,.recurring-page-actions,
+  .recurring-total-cards,.recurring-action-buttons,.filters,.form-grid,.field{
+    min-width:0;
+    max-width:100%;
+  }
+
+  .topbar{width:100%;align-items:flex-start;flex-wrap:wrap}
+  .top-actions{
+    flex:0 0 100%;
+    width:100%;
+    margin-left:0;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto auto;
+    align-items:end;
+    gap:10px 8px;
+  }
+  .live-sync-status{grid-column:1;grid-row:1;min-width:0;justify-self:start}
+  .country-control{grid-column:2;grid-row:1;justify-self:end}
+  #refreshButton{grid-column:3;grid-row:1;justify-self:end}
+  #globalPeriodSlot{grid-column:1/-1;grid-row:2;width:100%;align-self:auto}
+  .global-period{
+    width:100%;
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    align-items:end;
+    gap:8px;
+  }
+  .global-period label,.global-period .select{width:100%;min-width:0}
+  .global-period .button{
+    grid-column:1/-1;
+    width:auto;
+    justify-self:end;
+  }
+
+  .page-head{
+    width:100%;
+    flex-direction:column;
+    align-items:stretch;
+    gap:16px;
+  }
+  .page-head-actions{
+    width:auto;
+    max-width:100%;
+    margin-left:auto;
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    justify-content:flex-end;
+    gap:9px;
+  }
+  .page-head-actions>.button{width:auto;max-width:100%}
+
+  .loan-page-actions{
+    width:auto;
+    display:grid;
+    grid-template-columns:1fr;
+    justify-items:end;
+  }
+  .loan-settled-filter,.loan-page-actions .button{
+    width:auto;
+    max-width:100%;
+    justify-content:center;
+  }
+
+  .recurring-page-actions{
+    width:100%;
+    align-items:stretch;
+  }
+  .recurring-page-actions .recurring-total-cards{
+    width:100%;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .recurring-action-buttons{
+    width:auto;
+    margin-left:auto;
+    display:grid;
+    grid-template-columns:1fr;
+    justify-items:end;
+  }
+  .recurring-action-buttons .button{
+    width:auto;
+    max-width:100%;
+    justify-content:center;
+  }
+
+  .filters,.transaction-filters{
+    width:100%;
+    grid-template-columns:1fr;
+    align-items:stretch;
+  }
+  .filters .input,.filters .select,.transaction-filters .input{
+    width:100%;
+    min-width:0;
+    max-width:100%;
+    grid-column:auto;
+  }
+
+  .modal-backdrop{width:100%;max-width:100%;padding:14px}
+  .modal-card,.confirm-card,.loan-detail-modal,.category-manager-modal{
+    width:100%;
+    max-width:100%;
+  }
+  input[type="date"].input{
+    display:block;
+    width:100%;
+    min-width:0;
+    max-width:100%;
+    box-sizing:border-box;
+  }
+
+  .daily-balance-scroll,.labeled-bars{
+    width:100%;
+    max-width:100%;
+    overflow-x:hidden;
+  }
+  .daily-balance-chart{width:100%;min-width:0}
+  .labeled-bar{min-width:0}
+  .analysis-grid,.analysis-grid-three,.category-visual{min-width:0;max-width:100%}
+
+  .recurring-row,.transaction-row{width:100%;min-width:0}
+  .recurring-row>div,.transaction-row>div{min-width:0}
+  .recurring-row strong,.recurring-row small,.transaction-row strong,.transaction-row small{
+    overflow-wrap:anywhere;
+  }
+  .recurring-row .amount,.transaction-row .amount{white-space:nowrap}
+}
+
+@media(max-width:430px){
+  .recurring-page-actions .recurring-total-cards{grid-template-columns:1fr}
+}
