@@ -1620,3 +1620,99 @@ html:not([data-cloud-boot="ready"]) .app-shell{visibility:hidden}
 @media(min-width:781px) and (max-width:900px) and (orientation:portrait){
   .recurring-page-actions{grid-template-columns:1fr}
 }
+
+
+/* Tablet vertical amplio: filtros en una fila y acciones junto al título */
+@media(min-width:940px) and (max-width:1100px) and (orientation:portrait){
+  .topbar{
+    grid-template-columns:minmax(0,1fr);
+    row-gap:14px;
+  }
+  .top-actions{
+    width:100%;
+    margin-left:0;
+    display:grid;
+    grid-template-columns:minmax(170px,1fr) auto 40px minmax(335px,.95fr);
+    align-items:end;
+    gap:9px;
+  }
+  .live-sync-status{
+    grid-column:1;
+    grid-row:1;
+    width:100%;
+    max-width:none;
+    justify-self:stretch;
+  }
+  .country-control{
+    grid-column:2;
+    grid-row:1;
+    justify-self:end;
+  }
+  #refreshButton{
+    grid-column:3;
+    grid-row:1;
+    justify-self:end;
+  }
+  #globalPeriodSlot{
+    grid-column:4;
+    grid-row:1;
+    width:100%;
+    margin-left:0;
+    align-self:end;
+  }
+  .global-period{
+    width:100%;
+    grid-template-columns:minmax(88px,.8fr) minmax(112px,1fr) auto;
+    gap:7px;
+  }
+  .global-period .button{
+    min-width:78px;
+    padding-right:10px;
+    padding-left:10px;
+  }
+
+  .page-head:not(:has(.recurring-page-actions)){
+    flex-direction:row;
+    align-items:center;
+    gap:24px;
+  }
+  .page-head:not(:has(.recurring-page-actions))>div:first-child{
+    flex:1 1 auto;
+    width:auto;
+    min-width:0;
+  }
+  .page-head:not(:has(.recurring-page-actions))>.button{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    flex:0 0 auto;
+    min-width:250px;
+    min-height:46px;
+    padding:12px 18px;
+  }
+  .page-head:not(:has(.recurring-page-actions))>.page-head-actions{
+    width:auto;
+    flex:0 0 auto;
+    margin-left:auto;
+    display:flex;
+    flex-direction:row;
+    align-items:stretch;
+    justify-content:flex-end;
+    gap:10px;
+  }
+  .page-head:not(:has(.recurring-page-actions))>.page-head-actions>.button,
+  .page-head:not(:has(.recurring-page-actions)) .loan-settled-filter{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:auto;
+    min-width:188px;
+    min-height:46px;
+    padding:12px 16px;
+    white-space:nowrap;
+  }
+  .page-head:not(:has(.recurring-page-actions))>.loan-page-actions{
+    display:flex;
+    grid-template-columns:none;
+  }
+}
