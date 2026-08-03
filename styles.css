@@ -1377,9 +1377,10 @@ html:not([data-cloud-boot="ready"]) .app-shell{visibility:hidden}
     display:inline-flex;
     align-items:center;
     justify-content:center;
+    flex:1 1 0;
     width:auto;
     min-width:0;
-    max-width:calc(50% - 4px);
+    max-width:none;
     min-height:39px;
     padding:9px 11px;
     font-size:12px;
@@ -1413,9 +1414,10 @@ html:not([data-cloud-boot="ready"]) .app-shell{visibility:hidden}
     display:inline-flex;
     align-items:center;
     justify-content:center;
+    flex:1 1 0;
     width:auto;
     min-width:0;
-    max-width:calc(50% - 4px);
+    max-width:none;
     min-height:39px;
     padding:9px 11px;
     font-size:12px;
@@ -1432,7 +1434,9 @@ html:not([data-cloud-boot="ready"]) .app-shell{visibility:hidden}
   .loan-settled-filter,
   .loan-page-actions>.button,
   .recurring-action-buttons .button{
-    max-width:calc(50% - 3px);
+    flex:1 1 0;
+    width:auto;
+    max-width:none;
     padding:8px 9px;
     font-size:11px;
   }
