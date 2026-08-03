@@ -1371,7 +1371,7 @@ html:not([data-cloud-boot="ready"]) .app-shell{visibility:hidden}
     justify-content:flex-end;
     gap:8px;
   }
-  .page-head-actions>.button,
+  .page-head-actions:has(>.button + .button)>.button,
   .loan-settled-filter,
   .loan-page-actions>.button{
     display:inline-flex;
@@ -1430,7 +1430,7 @@ html:not([data-cloud-boot="ready"]) .app-shell{visibility:hidden}
   .page-head-actions,
   .loan-page-actions,
   .recurring-action-buttons{gap:6px}
-  .page-head-actions>.button,
+  .page-head-actions:has(>.button + .button)>.button,
   .loan-settled-filter,
   .loan-page-actions>.button,
   .recurring-action-buttons .button{
