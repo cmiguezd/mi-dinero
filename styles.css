@@ -224,7 +224,7 @@ body[data-country="CO"] .labeled-bar .bar-value,body[data-country="CO"] .labeled
     grid-column:auto;
   }
 }
-@media(max-width:650px){
+@media(max-width:700px){
   .cards{
     grid-template-columns:repeat(2,minmax(0,1fr));
   }
@@ -235,17 +235,51 @@ body[data-country="CO"] .labeled-bar .bar-value,body[data-country="CO"] .labeled
   .metric-value{
     font-size:18px;
   }
-  .balance-flow{
-    grid-template-columns:1fr;
+  body[data-page="resumen"] .balance-flow{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:10px;
   }
-  .balance-flow-item,
-  .balance-flow-item:nth-last-child(-n+2),
-  .balance-flow-item:nth-child(3),
-  .balance-flow-item:last-child{
+  body[data-page="resumen"] .balance-flow-item,
+  body[data-page="resumen"] .balance-flow-item:nth-last-child(-n+2),
+  body[data-page="resumen"] .balance-flow-item:nth-child(3),
+  body[data-page="resumen"] .balance-flow-item:last-child{
     grid-column:auto;
-    min-height:132px;
+    min-width:0;
+    min-height:118px;
+    padding:15px 13px;
     border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line));
     border-top:3px solid var(--accent);
+  }
+  body[data-page="resumen"] .balance-flow-item:last-child:nth-child(odd){
+    grid-column:1/-1;
+  }
+  body[data-page="resumen"] .balance-flow-item span{
+    font-size:11px;
+  }
+  body[data-page="resumen"] .balance-flow-item strong{
+    margin:7px 0 4px;
+    font-size:clamp(16px,4.7vw,20px);
+    overflow-wrap:anywhere;
+  }
+  body[data-page="resumen"] .balance-flow-item small{
+    display:-webkit-box;
+    overflow:hidden;
+    -webkit-box-orient:vertical;
+    -webkit-line-clamp:3;
+    line-clamp:3;
+  }
+}
+@media(max-width:349px){
+  body[data-page="resumen"] .balance-flow{
+    grid-template-columns:1fr;
+  }
+  body[data-page="resumen"] .balance-flow-item,
+  body[data-page="resumen"] .balance-flow-item:nth-last-child(-n+2),
+  body[data-page="resumen"] .balance-flow-item:nth-child(3),
+  body[data-page="resumen"] .balance-flow-item:last-child{
+    grid-column:auto;
+    min-height:112px;
+    padding:15px;
   }
 }
 
