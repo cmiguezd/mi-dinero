@@ -30,6 +30,14 @@ const meta = {
 };
 const fallbackCategories = ["Alimentación","Vivienda","Transporte","Servicios","Salud","Compras","Entretenimiento","Viajes","Educación","Comisión bancaria","Otros"];
 const pageNames={resumen:"Resumen",transacciones:"Transacciones",presupuestos:"Presupuestos",transferencias:"Transferencias",prestamos:"Préstamos",recurrentes:"Recurrentes",configuracion:"Configuración"};
+const mobilePrimaryActions={
+  resumen:{kind:"transaction",label:"Nueva transacción"},
+  transacciones:{kind:"transaction",label:"Nueva transacción"},
+  presupuestos:{kind:"budget",label:"Nuevo presupuesto"},
+  recurrentes:{kind:"recurring",label:"Nuevo recurrente"},
+  transferencias:{kind:"transfer",label:"Nueva transferencia"},
+  prestamos:{kind:"loan",label:"Nuevo préstamo"}
+};
 
 function initialState(){return window.MI_DINERO_INITIAL_DATA?structuredClone(window.MI_DINERO_INITIAL_DATA):blankState()}
 function loadState(){try{const saved=localStorage.getItem(STORAGE_KEY);return saved?{...blankState(),...JSON.parse(saved)}:initialState()}catch{return initialState()}}
@@ -321,13 +329,15 @@ function isFlexibleCategory(category=""){
 function render(){
   applyTheme();
   document.body.dataset.country=state.country;
+  document.body.dataset.page=currentPage;
   $("#pageTitle").textContent=pageNames[currentPage];
-  $$(".nav-item").forEach(x=>x.classList.toggle("active",x.dataset.page===currentPage));
+  $(".nav-item").forEach(x=>x.classList.toggle("active",x.dataset.page===currentPage));
   document.querySelectorAll("#countrySwitch button").forEach(x=>x.classList.toggle("active",x.dataset.country===state.country));
   const views={resumen:renderDashboard,transacciones:renderTransactions,presupuestos:renderBudgets,transferencias:renderTransfers,prestamos:renderLoans,recurrentes:renderRecurrings,configuracion:renderSettings};
   $("#globalPeriodSlot").innerHTML=globalPeriodBar();
   $("#content").innerHTML=views[currentPage]();
   bindPage();
+  updateMobileNavigation();
 }
 function totals(tx=countryItems(state.transactions)){
   const income=tx.filter(x=>["ingreso","cobro"].includes(x.type)).reduce((a,b)=>a+Number(b.amount),0);
@@ -931,23 +941,75 @@ function escapeHtml(v=""){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","
 function escapeAttr(v=""){return escapeHtml(v)}
 
 const sidebar=$("#sidebar"),menuButton=$("#menuButton");
+const mobileBottomNav=$("#mobileBottomNav"),mobileMoreButton=$("#mobileMoreButton"),mobileMoreBackdrop=$("#mobileMoreBackdrop"),mobileContextAction=$("#mobileContextAction");
 const usesHamburgerMenu=()=>window.matchMedia("(max-width: 780px)").matches;
+const usesBottomNavigation=()=>window.matchMedia("(max-width: 700px)").matches;
+const mobileMorePages=new Set(["transferencias","prestamos","configuracion"]);
 function setMobileMenuOpen(open){
   sidebar.classList.toggle("open",open);
   menuButton.setAttribute("aria-expanded",String(open));
   menuButton.setAttribute("aria-label",open?"Cerrar menú":"Abrir menú");
 }
-$("#nav").onclick=e=>{const b=e.target.closest("[data-page]");if(!b)return;currentPage=b.dataset.page;setMobileMenuOpen(false);render()};
+function setMobileMoreOpen(open,{restoreFocus=false}={}){
+  mobileMoreBackdrop.classList.toggle("hidden",!open);
+  mobileMoreButton.setAttribute("aria-expanded",String(open));
+  document.body.classList.toggle("mobile-more-open",open);
+  updateMobileNavigation();
+  if(open)requestAnimationFrame(()=>$("#mobileMoreMenu [data-mobile-page]")?.focus());
+  else if(restoreFocus)mobileMoreButton.focus();
+}
+function updateMobileNavigation(){
+  const grouped=mobileMorePages.has(currentPage);
+  $("[data-mobile-page]",mobileBottomNav).forEach(button=>{
+    const active=button.dataset.mobilePage===currentPage;
+    button.classList.toggle("active",active);
+    if(active)button.setAttribute("aria-current","page");else button.removeAttribute("aria-current");
+  });
+  $("[data-mobile-page]",$("#mobileMoreMenu")).forEach(button=>{
+    const active=button.dataset.mobilePage===currentPage;
+    button.classList.toggle("active",active);
+    if(active)button.setAttribute("aria-current","page");else button.removeAttribute("aria-current");
+  });
+  mobileMoreButton.classList.toggle("active",grouped||!mobileMoreBackdrop.classList.contains("hidden"));
+  if(grouped)mobileMoreButton.setAttribute("aria-current","page");else mobileMoreButton.removeAttribute("aria-current");
+  const action=mobilePrimaryActions[currentPage];
+  mobileContextAction.classList.toggle("hidden",!action);
+  mobileContextAction.dataset.add=action?.kind||"";
+  mobileContextAction.querySelector("span").textContent=action?.label||"";
+  mobileContextAction.setAttribute("aria-label",action?.label||"Acción principal");
+}
+function navigateToPage(page){
+  if(!pageNames[page])return;
+  currentPage=page;
+  setMobileMenuOpen(false);
+  setMobileMoreOpen(false);
+  render();
+  if(usesBottomNavigation())window.scrollTo({top:0,behavior:"auto"});
+}
+$("#nav").onclick=e=>{const b=e.target.closest("[data-page]");if(!b)return;navigateToPage(b.dataset.page)};
+mobileBottomNav.onclick=e=>{
+  const pageButton=e.target.closest("[data-mobile-page]");
+  if(pageButton){navigateToPage(pageButton.dataset.mobilePage);return}
+  if(e.target.closest("#mobileMoreButton"))setMobileMoreOpen(mobileMoreBackdrop.classList.contains("hidden"));
+};
+$("#mobileMoreMenu").onclick=e=>{const b=e.target.closest("[data-mobile-page]");if(b)navigateToPage(b.dataset.mobilePage)};
+$("#closeMobileMore").onclick=()=>setMobileMoreOpen(false,{restoreFocus:true});
+mobileMoreBackdrop.onclick=e=>{if(e.target===mobileMoreBackdrop)setMobileMoreOpen(false,{restoreFocus:true})};
+mobileContextAction.onclick=()=>{const kind=mobileContextAction.dataset.add;if(kind)openForm(kind)};
 $("#countrySwitch").onclick=e=>{const b=e.target.closest("[data-country]");if(!b)return;state.country=b.dataset.country;localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render()};
 menuButton.onclick=e=>{e.stopPropagation();setMobileMenuOpen(!sidebar.classList.contains("open"))};
 document.addEventListener("click",e=>{
   if(usesHamburgerMenu()&&sidebar.classList.contains("open")&&!sidebar.contains(e.target)&&!menuButton.contains(e.target))setMobileMenuOpen(false);
 });
 document.addEventListener("keydown",e=>{
-  if(e.key==="Escape"&&usesHamburgerMenu())setMobileMenuOpen(false);
+  if(e.key==="Escape"){
+    if(usesHamburgerMenu())setMobileMenuOpen(false);
+    if(!mobileMoreBackdrop.classList.contains("hidden"))setMobileMoreOpen(false,{restoreFocus:true});
+  }
 });
 window.addEventListener("resize",()=>{
   if(!usesHamburgerMenu())setMobileMenuOpen(false);
+  if(!usesBottomNavigation()&&!mobileMoreBackdrop.classList.contains("hidden"))setMobileMoreOpen(false);
 });
 $("#refreshButton").onclick=()=>{const cloud=window.MiDineroCloud;if(!cloud?.isConnected()){toast("Conecta Google Sheets para actualizar los datos");cloud?.showLogin?.();return}cloud.pull()};
 window.miDineroGetState=()=>structuredClone(state);
