@@ -1504,3 +1504,119 @@ html:not([data-cloud-boot="ready"]) .app-shell{visibility:hidden}
     }
   }
 }
+
+/* Tablet vertical: cabeceras y filtros ordenados */
+@media(min-width:781px) and (max-width:1100px) and (orientation:portrait){
+  .topbar{
+    min-height:0;
+    display:grid;
+    grid-template-columns:minmax(0,1fr);
+    align-items:stretch;
+    row-gap:16px;
+    padding-top:22px;
+    padding-bottom:22px;
+  }
+  .topbar>.menu-button{display:none}
+  .topbar>div:first-of-type{min-width:0}
+  .top-actions{
+    width:100%;
+    margin-left:0;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto auto;
+    align-items:end;
+    gap:10px 9px;
+  }
+  .live-sync-status{
+    grid-column:1;
+    grid-row:1;
+    width:auto;
+    min-width:0;
+    max-width:100%;
+    height:auto;
+    min-height:36px;
+    justify-self:start;
+    padding:7px 11px;
+    white-space:normal;
+    line-height:1.25;
+  }
+  .live-sync-copy{
+    display:block;
+    min-width:0;
+    overflow-wrap:anywhere;
+  }
+  .country-control{
+    grid-column:2;
+    grid-row:1;
+    justify-self:end;
+  }
+  #refreshButton{
+    grid-column:3;
+    grid-row:1;
+    justify-self:end;
+  }
+  #globalPeriodSlot{
+    grid-column:1/-1;
+    grid-row:2;
+    width:min(540px,100%);
+    margin-left:auto;
+    align-self:auto;
+  }
+  .global-period{
+    width:100%;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) auto;
+    align-items:end;
+    gap:9px;
+  }
+  .global-period label,
+  .global-period .select{
+    width:100%;
+    min-width:0;
+  }
+  .global-period .button{
+    width:auto;
+    min-width:88px;
+    justify-content:center;
+  }
+
+  .page-head{
+    width:100%;
+    flex-direction:column;
+    align-items:stretch;
+    gap:16px;
+  }
+  .page-head>div:first-child{
+    width:100%;
+    min-width:0;
+  }
+  .page-head-actions{
+    width:100%;
+    margin-left:0;
+    justify-content:flex-end;
+  }
+  .recurring-page-actions{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(360px,.9fr);
+    align-items:stretch;
+    gap:12px;
+  }
+  .recurring-page-actions .recurring-total-cards{
+    width:100%;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .recurring-action-buttons{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    align-items:stretch;
+    gap:8px;
+  }
+  .recurring-action-buttons .button{
+    width:100%;
+    min-width:0;
+    justify-content:center;
+  }
+}
+
+@media(min-width:781px) and (max-width:900px) and (orientation:portrait){
+  .recurring-page-actions{grid-template-columns:1fr}
+}
