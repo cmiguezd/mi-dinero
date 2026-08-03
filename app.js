@@ -940,21 +940,14 @@ function setMobileMenuOpen(open){
 $("#nav").onclick=e=>{const b=e.target.closest("[data-page]");if(!b)return;currentPage=b.dataset.page;setMobileMenuOpen(false);render()};
 $("#countrySwitch").onclick=e=>{const b=e.target.closest("[data-country]");if(!b)return;state.country=b.dataset.country;localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render()};
 menuButton.onclick=e=>{e.stopPropagation();setMobileMenuOpen(!sidebar.classList.contains("open"))};
-sidebar.addEventListener("click",()=>{if(!usesHamburgerMenu())sidebar.classList.add("is-expanded")});
-sidebar.addEventListener("mouseleave",()=>{if(!usesHamburgerMenu())sidebar.classList.remove("is-expanded")});
 document.addEventListener("click",e=>{
-  if(usesHamburgerMenu()){
-    if(sidebar.classList.contains("open")&&!sidebar.contains(e.target)&&!menuButton.contains(e.target))setMobileMenuOpen(false);
-  }else if(!sidebar.contains(e.target))sidebar.classList.remove("is-expanded");
+  if(usesHamburgerMenu()&&sidebar.classList.contains("open")&&!sidebar.contains(e.target)&&!menuButton.contains(e.target))setMobileMenuOpen(false);
 });
 document.addEventListener("keydown",e=>{
-  if(e.key!=="Escape")return;
-  if(usesHamburgerMenu())setMobileMenuOpen(false);
-  else sidebar.classList.remove("is-expanded");
+  if(e.key==="Escape"&&usesHamburgerMenu())setMobileMenuOpen(false);
 });
 window.addEventListener("resize",()=>{
-  if(usesHamburgerMenu())sidebar.classList.remove("is-expanded");
-  else setMobileMenuOpen(false);
+  if(!usesHamburgerMenu())setMobileMenuOpen(false);
 });
 $("#refreshButton").onclick=()=>{const cloud=window.MiDineroCloud;if(!cloud?.isConnected()){toast("Conecta Google Sheets para actualizar los datos");cloud?.showLogin?.();return}cloud.pull()};
 window.miDineroGetState=()=>structuredClone(state);

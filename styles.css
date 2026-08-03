@@ -1453,11 +1453,11 @@ html:not([data-cloud-boot="ready"]) .app-shell{visibility:hidden}
     transition:width .22s ease,box-shadow .22s ease;
     will-change:width;
   }
-  .sidebar:hover,
-  .sidebar.is-expanded,
-  .sidebar:has(:focus-visible){
-    width:250px;
-    box-shadow:16px 0 42px rgba(0,0,0,.24);
+  @media(hover:hover) and (pointer:fine){
+    .sidebar:hover{
+      width:250px;
+      box-shadow:16px 0 42px rgba(0,0,0,.24);
+    }
   }
   .brand,
   .sidebar nav,
@@ -1486,15 +1486,21 @@ html:not([data-cloud-boot="ready"]) .app-shell{visibility:hidden}
   }
   .brand-name,
   .sidebar-footer>div:last-child{transition:opacity .14s ease}
-  .sidebar:not(:hover):not(.is-expanded):not(:has(:focus-visible)) .brand-name,
-  .sidebar:not(:hover):not(.is-expanded):not(:has(:focus-visible)) .nav-label,
-  .sidebar:not(:hover):not(.is-expanded):not(:has(:focus-visible)) .sidebar-footer>div:last-child{
+  .brand-name,
+  .nav-label,
+  .sidebar-footer>div:last-child{
     opacity:0;
     pointer-events:none;
   }
-  html[data-theme="light"] .sidebar:hover,
-  html[data-theme="light"] .sidebar.is-expanded,
-  html[data-theme="light"] .sidebar:has(:focus-visible){
-    box-shadow:16px 0 38px rgba(32,34,43,.12);
+  @media(hover:hover) and (pointer:fine){
+    .sidebar:hover .brand-name,
+    .sidebar:hover .nav-label,
+    .sidebar:hover .sidebar-footer>div:last-child{
+      opacity:1;
+      pointer-events:auto;
+    }
+    html[data-theme="light"] .sidebar:hover{
+      box-shadow:16px 0 38px rgba(32,34,43,.12);
+    }
   }
 }
