@@ -331,7 +331,7 @@ function render(){
   document.body.dataset.country=state.country;
   document.body.dataset.page=currentPage;
   $("#pageTitle").textContent=pageNames[currentPage];
-  $(".nav-item").forEach(x=>x.classList.toggle("active",x.dataset.page===currentPage));
+  $$(".nav-item").forEach(x=>x.classList.toggle("active",x.dataset.page===currentPage));
   document.querySelectorAll("#countrySwitch button").forEach(x=>x.classList.toggle("active",x.dataset.country===state.country));
   const views={resumen:renderDashboard,transacciones:renderTransactions,presupuestos:renderBudgets,transferencias:renderTransfers,prestamos:renderLoans,recurrentes:renderRecurrings,configuracion:renderSettings};
   $("#globalPeriodSlot").innerHTML=globalPeriodBar();
@@ -960,12 +960,12 @@ function setMobileMoreOpen(open,{restoreFocus=false}={}){
 }
 function updateMobileNavigation(){
   const grouped=mobileMorePages.has(currentPage);
-  $("[data-mobile-page]",mobileBottomNav).forEach(button=>{
+  $$("[data-mobile-page]",mobileBottomNav).forEach(button=>{
     const active=button.dataset.mobilePage===currentPage;
     button.classList.toggle("active",active);
     if(active)button.setAttribute("aria-current","page");else button.removeAttribute("aria-current");
   });
-  $("[data-mobile-page]",$("#mobileMoreMenu")).forEach(button=>{
+  $$("[data-mobile-page]",$("#mobileMoreMenu")).forEach(button=>{
     const active=button.dataset.mobilePage===currentPage;
     button.classList.toggle("active",active);
     if(active)button.setAttribute("aria-current","page");else button.removeAttribute("aria-current");
