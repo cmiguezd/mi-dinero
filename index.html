@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="styles.css?v=20260802-48">
+  <link rel="stylesheet" href="styles.css?v=20260803-49">
 </head>
 <body>
   <div class="cloud-gate" id="cloudGate" role="status" aria-live="polite">
@@ -87,6 +87,42 @@
     </main>
   </div>
 
+  <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Navegación principal">
+    <button type="button" class="mobile-nav-item active" data-mobile-page="resumen">
+      <i class="bi bi-house-door" aria-hidden="true"></i><span>Resumen</span>
+    </button>
+    <button type="button" class="mobile-nav-item" data-mobile-page="transacciones">
+      <i class="bi bi-arrow-down-up" aria-hidden="true"></i><span>Movimientos</span>
+    </button>
+    <button type="button" class="mobile-nav-item" data-mobile-page="presupuestos">
+      <i class="bi bi-pie-chart" aria-hidden="true"></i><span>Presupuestos</span>
+    </button>
+    <button type="button" class="mobile-nav-item" data-mobile-page="recurrentes">
+      <i class="bi bi-arrow-repeat" aria-hidden="true"></i><span>Recurrentes</span>
+    </button>
+    <button type="button" class="mobile-nav-item" id="mobileMoreButton" aria-expanded="false" aria-controls="mobileMoreMenu" aria-haspopup="dialog">
+      <i class="bi bi-grid" aria-hidden="true"></i><span>Más</span>
+    </button>
+  </nav>
+
+  <button type="button" class="button mobile-context-action hidden" id="mobileContextAction">
+    <i class="bi bi-plus-lg" aria-hidden="true"></i><span></span>
+  </button>
+
+  <div class="mobile-more-backdrop hidden" id="mobileMoreBackdrop">
+    <section class="mobile-more-menu" id="mobileMoreMenu" role="dialog" aria-modal="true" aria-labelledby="mobileMoreTitle">
+      <div class="mobile-more-head">
+        <div><p class="eyebrow">NAVEGACIÓN</p><h2 id="mobileMoreTitle">Más opciones</h2></div>
+        <button type="button" class="icon-button" id="closeMobileMore" aria-label="Cerrar"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+      </div>
+      <div class="mobile-more-links">
+        <button type="button" data-mobile-page="transferencias"><i class="bi bi-arrow-left-right" aria-hidden="true"></i><span><strong>Transferencias</strong><small>Movimientos entre países</small></span><i class="bi bi-chevron-right" aria-hidden="true"></i></button>
+        <button type="button" data-mobile-page="prestamos"><i class="bi bi-cash-coin" aria-hidden="true"></i><span><strong>Préstamos</strong><small>Deudas y cuentas por cobrar</small></span><i class="bi bi-chevron-right" aria-hidden="true"></i></button>
+        <button type="button" data-mobile-page="configuracion"><i class="bi bi-gear" aria-hidden="true"></i><span><strong>Configuración</strong><small>Apariencia, categorías y sincronización</small></span><i class="bi bi-chevron-right" aria-hidden="true"></i></button>
+      </div>
+    </section>
+  </div>
+
   <div class="modal-backdrop hidden" id="modal">
     <div class="modal-card">
       <div class="modal-head"><div><p class="eyebrow" id="modalEyebrow">NUEVO</p><h2 id="modalTitle">Registro</h2></div><button class="icon-button" data-close aria-label="Cerrar"><i class="bi bi-x-lg" aria-hidden="true"></i></button></div>
@@ -105,7 +141,7 @@
   <div class="toast" id="toast"></div>
   <script src="initial-data.js"></script>
   <script src="cloud-config.js"></script>
-  <script src="app.js?v=20260802-56"></script>
+  <script src="app.js?v=20260803-57"></script>
   <script src="cloud-sync.js?v=20260731-5"></script>
 </body>
 </html>
