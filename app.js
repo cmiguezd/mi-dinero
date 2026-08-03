@@ -930,9 +930,32 @@ function importData(e){const file=e.target.files[0];if(!file)return;const reader
 function escapeHtml(v=""){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
 function escapeAttr(v=""){return escapeHtml(v)}
 
-$("#nav").onclick=e=>{const b=e.target.closest("[data-page]");if(!b)return;currentPage=b.dataset.page;$("#sidebar").classList.remove("open");render()};
+const sidebar=$("#sidebar"),menuButton=$("#menuButton");
+const usesHamburgerMenu=()=>window.matchMedia("(max-width: 780px)").matches;
+function setMobileMenuOpen(open){
+  sidebar.classList.toggle("open",open);
+  menuButton.setAttribute("aria-expanded",String(open));
+  menuButton.setAttribute("aria-label",open?"Cerrar menú":"Abrir menú");
+}
+$("#nav").onclick=e=>{const b=e.target.closest("[data-page]");if(!b)return;currentPage=b.dataset.page;setMobileMenuOpen(false);render()};
 $("#countrySwitch").onclick=e=>{const b=e.target.closest("[data-country]");if(!b)return;state.country=b.dataset.country;localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render()};
-$("#menuButton").onclick=()=>$("#sidebar").classList.toggle("open");
+menuButton.onclick=e=>{e.stopPropagation();setMobileMenuOpen(!sidebar.classList.contains("open"))};
+sidebar.addEventListener("click",()=>{if(!usesHamburgerMenu())sidebar.classList.add("is-expanded")});
+sidebar.addEventListener("mouseleave",()=>{if(!usesHamburgerMenu())sidebar.classList.remove("is-expanded")});
+document.addEventListener("click",e=>{
+  if(usesHamburgerMenu()){
+    if(sidebar.classList.contains("open")&&!sidebar.contains(e.target)&&!menuButton.contains(e.target))setMobileMenuOpen(false);
+  }else if(!sidebar.contains(e.target))sidebar.classList.remove("is-expanded");
+});
+document.addEventListener("keydown",e=>{
+  if(e.key!=="Escape")return;
+  if(usesHamburgerMenu())setMobileMenuOpen(false);
+  else sidebar.classList.remove("is-expanded");
+});
+window.addEventListener("resize",()=>{
+  if(usesHamburgerMenu())sidebar.classList.remove("is-expanded");
+  else setMobileMenuOpen(false);
+});
 $("#refreshButton").onclick=()=>{const cloud=window.MiDineroCloud;if(!cloud?.isConnected()){toast("Conecta Google Sheets para actualizar los datos");cloud?.showLogin?.();return}cloud.pull()};
 window.miDineroGetState=()=>structuredClone(state);
 window.miDineroApplyState=(next,{silent=false}={})=>{state={...blankState(),...restoreLegacyRecurringChecks(next)};localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();if(!silent)toast("Datos sincronizados desde Google Sheets")};
