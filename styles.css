@@ -1757,6 +1757,60 @@ html:not([data-cloud-boot="ready"]) .app-shell{visibility:hidden}
 .mobile-context-action,
 .mobile-more-backdrop{display:none}
 
+/* Control manual de cuentas */
+.account-notice{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:15px;
+  padding:12px 15px;
+  border:1px solid color-mix(in srgb,var(--accent) 34%,var(--line));
+  border-radius:13px;
+  background:var(--accent-soft);
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.45;
+}
+.account-notice>.bi{flex:0 0 auto;color:var(--accent);font-size:17px}
+.account-reconciliation{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+.account-summary-card{min-width:0;padding:20px;display:grid;gap:8px}
+.account-summary-card>span{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.02em}
+.account-summary-card>strong{font-size:clamp(21px,2vw,29px);line-height:1.15;overflow-wrap:anywhere}
+.account-summary-card>small{min-height:30px;color:var(--muted);font-size:11px;line-height:1.4}
+.account-difference{border-left:3px solid var(--yellow)}
+.account-difference.is-unavailable{border-left-color:var(--muted)}
+.account-difference.is-match{border-left-color:var(--green);background:color-mix(in srgb,var(--green) 8%,var(--panel))}
+.account-difference.is-match>strong{color:var(--green)}
+.account-difference.is-over{border-left-color:var(--yellow);background:color-mix(in srgb,var(--yellow) 7%,var(--panel))}
+.account-difference.is-over>strong{color:var(--yellow)}
+.account-difference.is-under{border-left-color:var(--red);background:color-mix(in srgb,var(--red) 7%,var(--panel))}
+.account-difference.is-under>strong{color:var(--red)}
+.account-section-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:26px 0 13px}
+.account-section-head h3{margin:0 0 4px;font-size:17px}
+.account-section-head p{margin:0;font-size:12px}
+.account-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+.account-grid>.empty{grid-column:1/-1}
+.account-card{min-width:0;padding:19px}
+.account-card-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.account-card-icon{width:38px;height:38px;display:grid;place-items:center;border-radius:11px;background:var(--accent-soft);color:var(--accent);font-size:17px}
+.account-card h3{margin:17px 0 6px;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.account-card-balance{display:block;font-size:clamp(21px,2vw,27px);line-height:1.15;overflow-wrap:anywhere}
+.account-card>small{display:block;margin-top:11px;color:var(--muted);font-size:10px;line-height:1.35}
+@media(max-width:1050px){.account-reconciliation{grid-template-columns:repeat(2,minmax(0,1fr))}.account-difference{grid-column:1/-1}.account-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){
+  .account-notice{align-items:flex-start}
+  .account-reconciliation{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .account-summary-card{padding:15px}
+  .account-summary-card>strong{font-size:clamp(18px,5.4vw,23px)}
+  .account-difference{grid-column:1/-1}
+  .account-section-head{margin-top:22px}
+  .account-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .account-card{padding:15px}
+  .account-card h3{margin-top:14px}
+  .account-card-balance{font-size:clamp(18px,5.5vw,23px)}
+}
+@media(max-width:360px){.account-reconciliation,.account-grid{grid-template-columns:1fr}.account-difference{grid-column:auto}}
+
 @media(max-width:700px){
   .sidebar,
   .menu-button{display:none!important}
