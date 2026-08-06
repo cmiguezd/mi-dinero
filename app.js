@@ -382,6 +382,71 @@ function latestDashboardBalance(country=state.country){
   const balance=calculateMonthlyBalance(year,month,country,periodTx);
   return {value:balance?.closing??null,label:shiftedMonth(year,month).label,verified:Boolean(balance?.verified)};
 }
+
+const ACCOUNT_BRAND_CATALOG=[
+  {key:"nequi",label:"Nequi",match:["nequi"],mark:"N",bg:"#260029",fg:"#ff2f92"},
+  {key:"daviplata",label:"DaviPlata",match:["daviplata","davi plata"],mark:"D",bg:"#ed1c24",fg:"#ffffff"},
+  {key:"davivienda",label:"Davivienda",match:["davivienda"],mark:"D",bg:"#d71920",fg:"#ffffff"},
+  {key:"bbva",label:"BBVA",match:["bbva"],mark:"BBVA",bg:"#072146",fg:"#ffffff"},
+  {key:"bancolombia",label:"Bancolombia",match:["bancolombia","a la mano"],mark:"B",bg:"#ffd800",fg:"#111111"},
+  {key:"bogota",label:"Banco de Bogotá",match:["banco de bogota","banco bogota"],mark:"B",bg:"#004b93",fg:"#ffffff"},
+  {key:"occidente",label:"Banco de Occidente",match:["banco de occidente","banco occidente"],mark:"O",bg:"#ffffff",fg:"#d71920"},
+  {key:"popular",label:"Banco Popular",match:["banco popular"],mark:"P",bg:"#00853e",fg:"#ffffff"},
+  {key:"avvillas",label:"AV Villas",match:["av villas","avvillas"],mark:"AV",bg:"#e30613",fg:"#ffffff"},
+  {key:"falabella",label:"Banco Falabella",match:["falabella"],mark:"F",bg:"#7ab800",fg:"#ffffff"},
+  {key:"lulo",label:"Lulo Bank",match:["lulo"],mark:"L",bg:"#6723d7",fg:"#d9ff53"},
+  {key:"dale",label:"dale!",match:["dale!","dale banco","billetera dale"],mark:"d!",bg:"#ed1e79",fg:"#ffffff"},
+  {key:"rappipay",label:"RappiPay",match:["rappipay","rappi pay"],mark:"R",bg:"#ff5a1f",fg:"#ffffff"},
+  {key:"tpaga",label:"Tpaga",match:["tpaga"],mark:"T",bg:"#1665d8",fg:"#ffffff"},
+  {key:"nubank",label:"Nubank",match:["nubank","nu bank"],path:"M7.2795 5.4336c-1.1815 0-2.1846.4628-2.9432 1.252h-.002c-.0541-.0022-.1074-.002-.162-.002-1.5436 0-2.9925.8835-3.699 2.2559-.3088.5996-.4234 1.2442-.459 1.9003-.0321.589 0 1.1863 0 1.7696v5.6523H3.184s.0022-2.784 0-5.1777c-.0014-1.6112-.0118-3.0471 0-3.3418.056-1.3937.4372-2.3053 1.1484-3.0508 2.3585.0018 3.8852 1.6091 3.9705 4.168.0196.5874.0254 3.7304.0254 3.7304v3.672h3.1678v-4.965c0-1.5007.0127-2.8006-.0918-3.6952-.292-2.5-1.821-4.168-4.1248-4.168zm8.3903.3008l-3.166.0039v4.9648c0 1.5009-.0127 2.8007.0919 3.6953.2921 2.5001 1.821 4.168 4.1248 4.168 1.1815 0 2.1846-.4628 2.9432-1.252.0003-.0003.0016.0004.002 0 .0542.0023.1093.002.164.002 1.5435 0 2.9905-.8835 3.6971-2.2558.3088-.5997.4233-1.2442.459-1.9004.032-.5889 0-1.1862 0-1.7695V5.7383H20.816s-.0022 2.784 0 5.1777c.0015 1.6113.0119 3.047 0 3.3418-.056 1.3935-.4372 2.3053-1.1483 3.0508-2.3586-.0018-3.8853-1.6091-3.9706-4.168-.0196-.5874-.0273-2.0437-.0273-3.7324Z",bg:"#820ad1",fg:"#ffffff"},
+  {key:"alipay",label:"Alipay",match:["alipay","zhi fu bao","zhifubao","支付宝"],path:"M19.695 15.07c3.426 1.158 4.203 1.22 4.203 1.22V3.846c0-2.124-1.705-3.845-3.81-3.845H3.914C1.808.001.102 1.722.102 3.846v16.31c0 2.123 1.706 3.845 3.813 3.845h16.173c2.105 0 3.81-1.722 3.81-3.845v-.157s-6.19-2.602-9.315-4.119c-2.096 2.602-4.8 4.181-7.607 4.181-4.75 0-6.361-4.19-4.112-6.949.49-.602 1.324-1.175 2.617-1.497 2.025-.502 5.247.313 8.266 1.317a16.796 16.796 0 0 0 1.341-3.302H5.781v-.952h4.799V6.975H4.77v-.953h5.81V3.591s0-.409.411-.409h2.347v2.84h5.744v.951h-5.744v1.704h4.69a19.453 19.453 0 0 1-1.986 5.06c1.424.52 2.702 1.011 3.654 1.333m-13.81-2.032c-.596.06-1.71.325-2.321.869-1.83 1.608-.735 4.55 2.968 4.55 2.151 0 4.301-1.388 5.99-3.61-2.403-1.182-4.438-2.028-6.637-1.809",bg:"#1677ff",fg:"#ffffff"},
+  {key:"wechat",label:"WeChat Pay",match:["wechat","we chat","weixin","微信"],path:"M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.203 3.002 5.55a.59.59 0 0 1 .213.665l-.39 1.48c-.019.07-.048.141-.048.213 0 .163.13.295.29.295a.326.326 0 0 0 .167-.054l1.903-1.114a.864.864 0 0 1 .717-.098 10.16 10.16 0 0 0 2.837.403c.276 0 .543-.027.811-.05-.857-2.578.157-4.972 1.932-6.446 1.703-1.415 3.882-1.98 5.853-1.838-.576-3.583-4.196-6.348-8.596-6.348zM5.785 5.991c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178A1.17 1.17 0 0 1 4.623 7.17c0-.651.52-1.18 1.162-1.18zm5.813 0c.642 0 1.162.529 1.162 1.18a1.17 1.17 0 0 1-1.162 1.178 1.17 1.17 0 0 1-1.162-1.178c0-.651.52-1.18 1.162-1.18zm5.34 2.867c-1.797-.052-3.746.512-5.28 1.786-1.72 1.428-2.687 3.72-1.78 6.22.942 2.453 3.666 4.229 6.884 4.229.826 0 1.622-.12 2.361-.336a.722.722 0 0 1 .598.082l1.584.926a.272.272 0 0 0 .14.047c.134 0 .24-.111.24-.247 0-.06-.023-.12-.038-.177l-.327-1.233a.582.582 0 0 1-.023-.156.49.49 0 0 1 .201-.398C23.024 18.48 24 16.82 24 14.98c0-3.21-2.931-5.837-6.656-6.088V8.89c-.135-.01-.27-.027-.407-.03zm-2.53 3.274c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.982.97-.982zm4.844 0c.535 0 .969.44.969.982a.976.976 0 0 1-.969.983.976.976 0 0 1-.969-.983c0-.542.434-.982.969-.982z",bg:"#07c160",fg:"#ffffff"},
+  {key:"bankofchina",label:"Bank of China",match:["bank of china","banco de china","中国银行","boc china"],mark:"中",bg:"#b50923",fg:"#ffffff"},
+  {key:"icbc",label:"ICBC",match:["icbc","industrial and commercial bank","工商银行"],mark:"工",bg:"#c8102e",fg:"#ffffff"},
+  {key:"ccb",label:"China Construction Bank",match:["china construction bank","construction bank","ccb","建设银行"],mark:"CCB",bg:"#005baa",fg:"#ffffff"},
+  {key:"abc",label:"Agricultural Bank of China",match:["agricultural bank of china","agriculture bank","abc bank","农业银行"],mark:"ABC",bg:"#008675",fg:"#ffffff"},
+  {key:"cmb",label:"China Merchants Bank",match:["china merchants bank","cmb","招商银行"],mark:"CMB",bg:"#c8102e",fg:"#ffffff"},
+  {key:"unionpay",label:"UnionPay",match:["unionpay","union pay","银联"],mark:"UP",bg:"#1768a5",fg:"#ffffff"},
+  {key:"bocom",label:"Bank of Communications",match:["bank of communications","bocom","交通银行"],mark:"BC",bg:"#005ca9",fg:"#ffffff"},
+  {key:"psbc",label:"Postal Savings Bank of China",match:["postal savings bank","psbc","邮储银行"],mark:"PS",bg:"#008264",fg:"#ffffff"},
+  {key:"pingan",label:"Ping An Bank",match:["ping an","pingan","平安银行"],mark:"PA",bg:"#f05a28",fg:"#ffffff"},
+  {key:"paypal",label:"PayPal",match:["paypal","pay pal"],path:"M15.607 4.653H8.941L6.645 19.251H1.82L4.862 0h7.995c3.754 0 6.375 2.294 6.473 5.513-.648-.478-2.105-.86-3.722-.86m6.57 5.546c0 3.41-3.01 6.853-6.958 6.853h-2.493L11.595 24H6.74l1.845-11.538h3.592c4.208 0 7.346-3.634 7.153-6.949a5.24 5.24 0 0 1 2.848 4.686M9.653 5.546h6.408c.907 0 1.942.222 2.363.541-.195 2.741-2.655 5.483-6.441 5.483H8.714Z",bg:"#ffffff",fg:"#003087"},
+  {key:"wise",label:"Wise",match:["wise","transferwise"],path:"M6.488 7.469 0 15.05h11.585l1.301-3.576H7.922l3.033-3.507.01-.092L8.993 4.48h8.873l-6.878 18.925h4.706L24 .595H2.543l3.945 6.874Z",bg:"#9fe870",fg:"#163300"},
+  {key:"applepay",label:"Apple Pay",match:["apple pay","applepay"],mark:"Apple",bg:"#ffffff",fg:"#111111"},
+  {key:"googlepay",label:"Google Pay",match:["google pay","googlepay","gpay"],mark:"G Pay",bg:"#ffffff",fg:"#3c4043"},
+  {key:"mercadopago",label:"Mercado Pago",match:["mercado pago","mercadopago"],mark:"MP",bg:"#009ee3",fg:"#ffffff"},
+  {key:"visa",label:"Visa",match:["visa"],path:"M9.112 8.262L5.97 15.758H3.92L2.374 9.775c-.094-.368-.175-.503-.461-.658C1.447 8.864.677 8.627 0 8.479l.046-.217h3.3a.904.904 0 01.894.764l.817 4.338 2.018-5.102zm8.033 5.049c.008-1.979-2.736-2.088-2.717-2.972.006-.269.262-.555.822-.628a3.66 3.66 0 011.913.336l.34-1.59a5.207 5.207 0 00-1.814-.333c-1.917 0-3.266 1.02-3.278 2.479-.012 1.079.963 1.68 1.698 2.04.756.367 1.01.603 1.006.931-.005.504-.602.725-1.16.734-.975.015-1.54-.263-1.992-.473l-.351 1.642c.453.208 1.289.39 2.156.398 2.037 0 3.37-1.006 3.377-2.564m5.061 2.447H24l-1.565-7.496h-1.656a.883.883 0 00-.826.55l-2.909 6.946h2.036l.405-1.12h2.488zm-2.163-2.656l1.02-2.815.588 2.815zm-8.16-4.84l-1.603 7.496H8.34l1.605-7.496z",bg:"#ffffff",fg:"#1a1f71"},
+  {key:"mastercard",label:"Mastercard",match:["mastercard","master card"],mark:"MC",bg:"#111111",fg:"#ff5f00"},
+  {key:"revolut",label:"Revolut",match:["revolut"],mark:"R",bg:"#ffffff",fg:"#111111"}
+];
+function normalizeAccountName(value=""){
+  return String(value).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[_-]+/g," ").replace(/\s+/g," ").trim();
+}
+function accountBrandFor(name){
+  const normalized=normalizeAccountName(name);
+  const brand=ACCOUNT_BRAND_CATALOG.find(item=>item.match.some(term=>normalized.includes(normalizeAccountName(term))));
+  if(brand)return brand;
+  const fallbacks=[
+    {key:"cash",label:"Efectivo",match:/efectivo|cash|caja|caja menor/,icon:"bi-cash-stack",bg:"var(--accent-soft)",fg:"var(--accent)"},
+    {key:"card",label:"Tarjeta",match:/tarjeta|credito|debito|card/,icon:"bi-credit-card",bg:"var(--accent-soft)",fg:"var(--accent)"},
+    {key:"savings",label:"Ahorros",match:/ahorro|savings|deposito/,icon:"bi-piggy-bank",bg:"var(--accent-soft)",fg:"var(--accent)"},
+    {key:"investment",label:"Inversiones",match:/inversion|investment|broker|fondo|cdt/,icon:"bi-graph-up-arrow",bg:"var(--accent-soft)",fg:"var(--accent)"},
+    {key:"crypto",label:"Cripto",match:/crypto|cripto|bitcoin|ethereum|binance/,icon:"bi-currency-bitcoin",bg:"var(--accent-soft)",fg:"var(--accent)"},
+    {key:"bank",label:"Banco",match:/banco|bank|cuenta corriente|checking/,icon:"bi-bank",bg:"var(--accent-soft)",fg:"var(--accent)"},
+    {key:"wallet",label:"Billetera",match:/billetera|wallet|pay/,icon:"bi-wallet2",bg:"var(--accent-soft)",fg:"var(--accent)"}
+  ];
+  return fallbacks.find(item=>item.match.test(normalized))||{key:"generic",label:"Cuenta",icon:"bi-wallet2",bg:"var(--accent-soft)",fg:"var(--accent)"};
+}
+function accountBrandMark(name){
+  const brand=accountBrandFor(name);
+  const content=brand.path
+    ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${brand.path}"></path></svg>`
+    : brand.mark
+      ? `<span class="account-brand-mark ${brand.mark.length>2?"is-word":""}">${escapeHtml(brand.mark)}</span>`
+      : `<i class="bi ${brand.icon}" aria-hidden="true"></i>`;
+  return `<span class="account-card-icon account-brand-icon" data-brand="${escapeAttr(brand.key)}" style="--brand-bg:${brand.bg};--brand-fg:${brand.fg}" role="img" aria-label="Logo de ${escapeAttr(brand.label)}">${content}</span>`;
+}
+
 function accountUpdateLabel(value){
   if(!value)return "Sin actualización registrada";
   const date=new Date(value);if(Number.isNaN(date.getTime()))return "Actualización reciente";
@@ -415,7 +480,7 @@ function renderAccounts(){
       <article class="panel account-summary-card account-difference ${differenceTone}" aria-live="polite"><span>Diferencia por conciliar</span><strong>${differenceValue}</strong><small>${escapeHtml(differenceCopy)}</small></article>
     </section>
     <div class="account-section-head"><div><h3>Tus cuentas en ${meta[state.country].name}</h3><p class="muted">Edita el saldo cada vez que quieras comprobarlo. El valor anterior será reemplazado.</p></div></div>
-    <section class="account-grid">${items.length?items.map(item=>`<article class="panel account-card"><div class="account-card-top"><span class="account-card-icon" aria-hidden="true"><i class="bi bi-wallet2"></i></span><div class="row-actions"><button data-edit="account" data-id="${item.id}" title="Editar cuenta" aria-label="Editar ${escapeAttr(item.name)}"><i class="bi bi-pencil-square" aria-hidden="true"></i></button><button data-delete="account" data-id="${item.id}" title="Eliminar cuenta" aria-label="Eliminar ${escapeAttr(item.name)}"><i class="bi bi-trash3" aria-hidden="true"></i></button></div></div><h3>${escapeHtml(item.name)}</h3><strong class="account-card-balance">${money(item.balance)}</strong><small>${escapeHtml(accountUpdateLabel(item.updatedAt))}</small></article>`).join(""):empty("Aún no tienes cuentas registradas",`Agrega bancos, billeteras o efectivo de ${meta[state.country].name} para comparar su total.`)}</section>`;
+    <section class="account-grid">${items.length?items.map(item=>`<article class="panel account-card"><div class="account-card-top">${accountBrandMark(item.name)}<div class="row-actions"><button data-edit="account" data-id="${item.id}" title="Editar cuenta" aria-label="Editar ${escapeAttr(item.name)}"><i class="bi bi-pencil-square" aria-hidden="true"></i></button><button data-delete="account" data-id="${item.id}" title="Eliminar cuenta" aria-label="Eliminar ${escapeAttr(item.name)}"><i class="bi bi-trash3" aria-hidden="true"></i></button></div></div><h3>${escapeHtml(item.name)}</h3><strong class="account-card-balance">${money(item.balance)}</strong><small>${escapeHtml(accountUpdateLabel(item.updatedAt))}</small></article>`).join(""):empty("Aún no tienes cuentas registradas",`Agrega bancos, billeteras o efectivo de ${meta[state.country].name} para comparar su total.`)}</section>`;
 }
 function chartMoney(value){
   const decimals=state.country==="CO"?0:2;
