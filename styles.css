@@ -2015,3 +2015,55 @@ html:not([data-cloud-boot="ready"]) .app-shell{visibility:hidden}
     max-width:calc(100vw - 24px);
   }
 }
+
+
+/* Cuentas compactas y logos automáticos */
+.account-reconciliation{gap:11px}
+.account-summary-card{padding:16px;gap:5px}
+.account-summary-card>strong{font-size:clamp(19px,1.7vw,25px)}
+.account-summary-card>small{min-height:0}
+.account-section-head{margin-top:21px}
+.account-grid{grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:11px}
+.account-card{padding:13px}
+.account-card-top{gap:8px}
+.account-card-icon{
+  width:34px;
+  height:34px;
+  flex:0 0 34px;
+  border-radius:10px;
+  overflow:hidden;
+}
+.account-brand-icon{
+  background:var(--brand-bg);
+  color:var(--brand-fg);
+  box-shadow:inset 0 0 0 1px rgba(127,127,127,.14);
+}
+.account-brand-icon svg{width:21px;height:21px;display:block;fill:currentColor}
+.account-brand-mark{font-size:15px;font-weight:800;line-height:1;letter-spacing:-.04em}
+.account-brand-mark.is-word{font-size:8px;letter-spacing:-.03em}
+.account-card .row-actions{gap:2px}
+.account-card .row-actions button{width:27px;height:27px}
+.account-card h3{margin:10px 0 4px;font-size:13px}
+.account-card-balance{font-size:clamp(17px,1.45vw,22px)}
+.account-card>small{margin-top:7px;font-size:9px}
+@media(max-width:1050px){
+  .account-grid{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
+}
+@media(max-width:700px){
+  .account-reconciliation{gap:8px}
+  .account-summary-card{padding:12px}
+  .account-summary-card>strong{font-size:clamp(17px,4.8vw,21px)}
+  .account-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .account-card{padding:11px}
+  .account-card-icon{width:31px;height:31px;flex-basis:31px}
+  .account-brand-icon svg{width:19px;height:19px}
+  .account-card h3{margin-top:9px;font-size:12px}
+  .account-card-balance{font-size:clamp(16px,4.7vw,20px)}
+  .account-card>small{margin-top:6px;font-size:8.5px}
+}
+@media(max-width:360px){
+  .account-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .account-card{padding:9px}
+  .account-card .row-actions button{width:25px;height:25px}
+  .account-card-balance{font-size:15px}
+}
