@@ -6,7 +6,7 @@ const RECURRING_CHECKS_MIGRATION_KEY = "mi-dinero-recurring-checks-migrated-v1";
 const LOAN_SETTLED_FILTER_KEY = "mi-dinero-hide-settled-loans";
 const blankState = () => ({
   version: 3, country: "CN",
-  transactions: [], budgets: [], transfers: [], loans: [], recurrings: [], recurringChecks: {},
+  transactions: [], accounts: [], budgets: [], transfers: [], loans: [], recurrings: [], recurringChecks: {},
   settings: { user: "Carlos", email: "Cuenta local", dataSource: "Este dispositivo" }
 });
 let state = loadState();
@@ -29,9 +29,10 @@ const meta = {
   CO:{name:"Colombia",currency:"COP",symbol:"$",locale:"es-CO"}
 };
 const fallbackCategories = ["Alimentación","Vivienda","Transporte","Servicios","Salud","Compras","Entretenimiento","Viajes","Educación","Comisión bancaria","Otros"];
-const pageNames={resumen:"Resumen",transacciones:"Transacciones",presupuestos:"Presupuestos",transferencias:"Transferencias",prestamos:"Préstamos",recurrentes:"Recurrentes",configuracion:"Configuración"};
+const pageNames={resumen:"Resumen",cuentas:"Cuentas",transacciones:"Transacciones",presupuestos:"Presupuestos",transferencias:"Transferencias",prestamos:"Préstamos",recurrentes:"Recurrentes",configuracion:"Configuración"};
 const mobilePrimaryActions={
   resumen:{kind:"transaction",label:"Nueva transacción"},
+  cuentas:{kind:"account",label:"Nueva cuenta"},
   transacciones:{kind:"transaction",label:"Nueva transacción"},
   presupuestos:{kind:"budget",label:"Nuevo presupuesto"},
   recurrentes:{kind:"recurring",label:"Nuevo recurrente"},
@@ -39,7 +40,7 @@ const mobilePrimaryActions={
   prestamos:{kind:"loan",label:"Nuevo préstamo"}
 };
 
-function initialState(){return window.MI_DINERO_INITIAL_DATA?structuredClone(window.MI_DINERO_INITIAL_DATA):blankState()}
+function initialState(){return window.MI_DINERO_INITIAL_DATA?{...blankState(),...structuredClone(window.MI_DINERO_INITIAL_DATA)}:blankState()}
 function loadState(){try{const saved=localStorage.getItem(STORAGE_KEY);return saved?{...blankState(),...JSON.parse(saved)}:initialState()}catch{return initialState()}}
 async function saveState(previousState){
   const cloud=window.MiDineroCloud;
@@ -245,9 +246,9 @@ function shiftedMonth(year,month,delta=0){
     label:`${label.charAt(0).toUpperCase()+label.slice(1)} ${date.getUTCFullYear()}`
   };
 }
-function openingBalanceForMonth(year,month){
+function openingBalanceForMonth(year,month,country=state.country){
   const ym=`${year}-${month}`;
-  const rows=countryItems(state.transactions)
+  const rows=state.transactions.filter(x=>x.country===country)
     .filter(x=>x.date?.slice(0,7)===ym&&isCarryForwardTransaction(x))
     .sort((a,b)=>a.date.localeCompare(b.date));
   return rows.length?Number(rows[0].amount)||0:null;
@@ -256,10 +257,9 @@ function isLoanTransaction(x){
   const text=`${x.category||""} ${x.description||""} ${x.originalType||x.tipoOriginal||x.Tipo_original||""}`;
   return /(pr[eé]stamo|deuda|nos pagan|capital prestado|pago de capital)/i.test(text);
 }
-function monthlyBalanceReconciliation(){
-  if(dashboardMonth==="all")return null;
-  const opening=openingBalanceForMonth(dashboardYear,dashboardMonth);
-  const periodTx=dashboardTransactions({ignoreCategory:true});
+function calculateMonthlyBalance(year,month,country,periodTx){
+  const opening=openingBalanceForMonth(year,month,country);
+  const ym=`${year}-${month}`;
   const operatingTx=periodTx.filter(x=>!isLoanTransaction(x));
   const periodTotals=totals(operatingTx);
   const directFlow=periodTotals.income-periodTotals.expense;
@@ -268,15 +268,14 @@ function monthlyBalanceReconciliation(){
   const adjustmentFlow=periodTx
     .filter(x=>x.type==="ajuste"&&!isLoanTransaction(x))
     .reduce((sum,x)=>sum+transactionCashChange(x),0);
-  const ym=`${dashboardYear}-${dashboardMonth}`;
   const transferFlow=state.transfers.reduce((sum,x)=>{
-    if(x.from===state.country&&x.date?.startsWith(ym))sum-=(Number(x.sent)||0)+(Number(x.fee)||0);
+    if(x.from===country&&x.date?.startsWith(ym))sum-=(Number(x.sent)||0)+(Number(x.fee)||0);
     const receivedDate=x.arrivalDate||x.date;
-    if(x.to===state.country&&receivedDate?.startsWith(ym))sum+=Number(x.received)||0;
+    if(x.to===country&&receivedDate?.startsWith(ym))sum+=Number(x.received)||0;
     return sum;
   },0);
-  const next=shiftedMonth(dashboardYear,dashboardMonth,1);
-  const recordedClosing=openingBalanceForMonth(next.year,next.month);
+  const next=shiftedMonth(year,month,1);
+  const recordedClosing=openingBalanceForMonth(next.year,next.month,country);
   const calculatedOther=adjustmentFlow+transferFlow;
   const closing=recordedClosing!==null?recordedClosing:(opening!==null?opening+directFlow+loanFlow+calculatedOther:null);
   const transferAndAdjustments=opening!==null&&recordedClosing!==null
@@ -287,6 +286,10 @@ function monthlyBalanceReconciliation(){
     income:periodTotals.income,expense:periodTotals.expense,
     loanCount:loanTx.length,verified:recordedClosing!==null,nextLabel:next.label
   };
+}
+function monthlyBalanceReconciliation(){
+  if(dashboardMonth==="all")return null;
+  return calculateMonthlyBalance(dashboardYear,dashboardMonth,state.country,dashboardTransactions({ignoreCategory:true}));
 }
 function signedMoney(value){
   const number=Number(value)||0;
@@ -333,7 +336,7 @@ function render(){
   $("#pageTitle").textContent=pageNames[currentPage];
   $$(".nav-item").forEach(x=>x.classList.toggle("active",x.dataset.page===currentPage));
   document.querySelectorAll("#countrySwitch button").forEach(x=>x.classList.toggle("active",x.dataset.country===state.country));
-  const views={resumen:renderDashboard,transacciones:renderTransactions,presupuestos:renderBudgets,transferencias:renderTransfers,prestamos:renderLoans,recurrentes:renderRecurrings,configuracion:renderSettings};
+  const views={resumen:renderDashboard,cuentas:renderAccounts,transacciones:renderTransactions,presupuestos:renderBudgets,transferencias:renderTransfers,prestamos:renderLoans,recurrentes:renderRecurrings,configuracion:renderSettings};
   $("#globalPeriodSlot").innerHTML=globalPeriodBar();
   $("#content").innerHTML=views[currentPage]();
   bindPage();
@@ -363,6 +366,57 @@ function renderDashboard(){
   <div class="panel daily-balance-panel"><div class="panel-head"><div><h3>Saldo día a día</h3><small>${dashboardMonth==="all"?"Selecciona un mes para ver cómo fluctuó tu saldo.":"Saldo conciliado al cierre de cada día; incluye entradas, gastos, transferencias y conciliación mensual."}</small></div></div>${dailyBalanceChart()}</div>`;
 }
 function metric(label,value,small,color){return `<article class="metric"><div class="metric-label"><span>${label}</span><i class="dot ${color}"></i></div><div class="metric-value">${value}</div><small>${small}</small></article>`}
+function latestDashboardBalance(country=state.country){
+  const periods=[];
+  state.transactions.forEach(x=>{if(x.country===country&&x.date)periods.push(x.date.slice(0,7))});
+  state.transfers.forEach(x=>{
+    if(x.from===country&&x.date)periods.push(x.date.slice(0,7));
+    const receivedDate=x.arrivalDate||x.date;
+    if(x.to===country&&receivedDate)periods.push(receivedDate.slice(0,7));
+  });
+  const sortedPeriods=[...new Set(periods.filter(x=>/^\d{4}-\d{2}$/.test(x)))].sort();
+  const latest=sortedPeriods[sortedPeriods.length-1];
+  if(!latest)return {value:null,label:"Sin periodo disponible",verified:false};
+  const [year,month]=latest.split("-");
+  const periodTx=state.transactions.filter(x=>x.country===country&&x.date?.slice(0,7)===latest);
+  const balance=calculateMonthlyBalance(year,month,country,periodTx);
+  return {value:balance?.closing??null,label:shiftedMonth(year,month).label,verified:Boolean(balance?.verified)};
+}
+function accountUpdateLabel(value){
+  if(!value)return "Sin actualización registrada";
+  const date=new Date(value);if(Number.isNaN(date.getTime()))return "Actualización reciente";
+  return `Actualizada ${new Intl.DateTimeFormat("es",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}).format(date)}`;
+}
+function renderAccounts(){
+  const items=countryItems(Array.isArray(state.accounts)?state.accounts:[]).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"es"));
+  const manualTotal=items.reduce((sum,item)=>sum+(Number(item.balance)||0),0);
+  const dashboard=latestDashboardBalance();
+  const difference=!items.length||dashboard.value===null?null:manualTotal-dashboard.value;
+  const tolerance=state.country==="CO"?.5:.005;
+  const matches=difference!==null&&Math.abs(difference)<tolerance;
+  const differenceTone=difference===null?"is-unavailable":matches?"is-match":difference>0?"is-over":"is-under";
+  const differenceValue=!items.length?"Pendiente":difference===null?"No disponible":matches?money(0):signedMoney(difference);
+  const differenceCopy=!items.length
+    ?"Agrega al menos una cuenta para iniciar la comparación."
+    :difference===null
+      ?"El tablero aún no tiene un saldo final disponible para comparar."
+    :matches
+      ?"El total manual coincide con el saldo del tablero."
+      :difference>0
+        ?`Hay ${money(Math.abs(difference))} más en tus cuentas que en el tablero.`
+        :`Faltan ${money(Math.abs(difference))} en tus cuentas frente al tablero.`;
+  const dashboardCopy=dashboard.value===null?dashboard.label:`${dashboard.label} · ${dashboard.verified?"Saldo conciliado":"Saldo estimado"}`;
+  const actions=`<button class="button" data-add="account"><i class="bi bi-plus-lg" aria-hidden="true"></i>Nueva cuenta</button>`;
+  return `${pageHead("Control de cuentas",`Comprueba que tus saldos reales coincidan con el tablero de ${meta[state.country].name}.`,actions)}
+    <div class="account-notice"><i class="bi bi-shield-check" aria-hidden="true"></i><span>Estos valores son independientes: no crean transacciones ni modifican ningún cálculo del tablero.</span></div>
+    <section class="account-reconciliation" aria-label="Comparación de saldos">
+      <article class="panel account-summary-card"><span>Saldo del tablero</span><strong>${dashboard.value===null?"No disponible":money(dashboard.value)}</strong><small>${escapeHtml(dashboardCopy)}</small></article>
+      <article class="panel account-summary-card"><span>Total en cuentas</span><strong>${money(manualTotal)}</strong><small>${items.length} ${items.length===1?"cuenta registrada":"cuentas registradas"}</small></article>
+      <article class="panel account-summary-card account-difference ${differenceTone}" aria-live="polite"><span>Diferencia por conciliar</span><strong>${differenceValue}</strong><small>${escapeHtml(differenceCopy)}</small></article>
+    </section>
+    <div class="account-section-head"><div><h3>Tus cuentas en ${meta[state.country].name}</h3><p class="muted">Edita el saldo cada vez que quieras comprobarlo. El valor anterior será reemplazado.</p></div></div>
+    <section class="account-grid">${items.length?items.map(item=>`<article class="panel account-card"><div class="account-card-top"><span class="account-card-icon" aria-hidden="true"><i class="bi bi-wallet2"></i></span><div class="row-actions"><button data-edit="account" data-id="${item.id}" title="Editar cuenta" aria-label="Editar ${escapeAttr(item.name)}"><i class="bi bi-pencil-square" aria-hidden="true"></i></button><button data-delete="account" data-id="${item.id}" title="Eliminar cuenta" aria-label="Eliminar ${escapeAttr(item.name)}"><i class="bi bi-trash3" aria-hidden="true"></i></button></div></div><h3>${escapeHtml(item.name)}</h3><strong class="account-card-balance">${money(item.balance)}</strong><small>${escapeHtml(accountUpdateLabel(item.updatedAt))}</small></article>`).join(""):empty("Aún no tienes cuentas registradas",`Agrega bancos, billeteras o efectivo de ${meta[state.country].name} para comparar su total.`)}</section>`;
+}
 function chartMoney(value){
   const decimals=state.country==="CO"?0:2;
   const number=Number(value)||0;
@@ -797,14 +851,15 @@ function bindDatePickers(root){
   });
 }
 function openForm(kind,id=null){
-  const map={transaction:"Transacción",budget:"Presupuesto",transfer:"Transferencia",loan:"Préstamo",recurring:"Pago recurrente"};
-  const collection={transaction:"transactions",budget:"budgets",transfer:"transfers",loan:"loans",recurring:"recurrings"}[kind];
+  const map={transaction:"Transacción",account:"Cuenta",budget:"Presupuesto",transfer:"Transferencia",loan:"Préstamo",recurring:"Pago recurrente"};
+  const collection={transaction:"transactions",account:"accounts",budget:"budgets",transfer:"transfers",loan:"loans",recurring:"recurrings"}[kind];
   const item=id?state[collection].find(x=>x.id===id):null;
   $("#modalEyebrow").textContent=id?"EDITAR":"NUEVO";$("#modalTitle").textContent=map[kind];
   const typeOpts=[{value:"gasto",label:"Gasto"},{value:"ingreso",label:"Ingreso"},{value:"cobro",label:"Cobro / reembolso"},{value:"ajuste",label:"Ajuste"}];
   const categoryNames=availableCategories(),catOpts=categoryNames.map(x=>({value:x,label:x}));
   let html="";
   if(kind==="transaction")html=formField("Descripción","description","text",item?.description||"",null,true)+formField("Tipo","type","text",item?.type||"gasto",typeOpts)+formField(`Monto (${meta[state.country].currency})`,"amount","number",item?.amount||"")+formField("Categoría","category","text",item?.category||categoryNames[0],catOpts)+formField("Fecha","date","date",item?.date||today());
+  if(kind==="account")html=`<div class="field full"><label>Nombre de la cuenta</label><input class="input" name="name" type="text" maxlength="80" value="${escapeAttr(item?.name||"")}" placeholder="Ej. ICBC, Nequi o Efectivo" autocomplete="off" required></div><div class="field full"><label>Saldo actual (${meta[state.country].currency})</label><input class="input" name="balance" type="number" step="0.01" inputmode="decimal" value="${escapeAttr(item?.balance??"")}" required><small class="field-help">Al guardar, este valor reemplaza el saldo anterior.</small></div>`;
   if(kind==="budget")html=formField("Categoría","category","text",item?.category||categoryNames[0],catOpts)+formField(`Límite (${meta[state.country].currency})`,"amount","number",item?.amount||"");
   if(kind==="transfer")html=formField("Desde","from","text",item?.from||state.country,[{value:"CN",label:"China (RMB)"},{value:"CO",label:"Colombia (COP)"}])+formField("Hacia","to","text",item?.to||(state.country==="CN"?"CO":"CN"),[{value:"CO",label:"Colombia (COP)"},{value:"CN",label:"China (RMB)"}])+formField("Monto enviado","sent","number",item?.sent||"")+formField("Monto recibido","received","number",item?.received||"")+formField("Comisión opcional","fee","number",item?.fee||0)+formField("Fecha","date","date",item?.date||today());
   if(kind==="loan")html=formField("Tipo","direction","text",item?.direction||"owed",[{value:"owed",label:"Dinero que debemos"},{value:"receivable",label:"Dinero que nos deben"}])+formField("Persona o entidad","person","text",item?.person||"")+formField("Descripción / motivo (opcional)","note","text",item?.note||"")+formField("Monto original","amount","number",item?.amount||"")+formField("Saldo pendiente","balance","number",item?.balance??item?.amount??"")+formField("Fecha","date","date",item?.date||today())+(!id?`<label class="form-check full"><input type="checkbox" name="affectBalance" value="yes"><span aria-hidden="true"><i class="bi bi-check-lg"></i></span><div><strong>Crear también una transacción</strong><small>Actívalo solo si el dinero entra o sale de tu saldo ahora. Déjalo apagado si solo documentas una deuda anterior.</small></div></label>`:"");
@@ -874,8 +929,14 @@ $("#recordForm").onsubmit=async e=>{
     }else setButtonBusy(submitButton,false);
     return;
   }
-  const collection={transaction:"transactions",budget:"budgets",transfer:"transfers",loan:"loans",recurring:"recurrings"}[kind];
+  const collection={transaction:"transactions",account:"accounts",budget:"budgets",transfer:"transfers",loan:"loans",recurring:"recurrings"}[kind];
   ["amount","sent","received","fee","balance","day"].forEach(k=>{if(k in data)data[k]=Number(data[k])});
+  if(kind==="account"){
+    data.name=String(data.name||"").trim().replace(/\s+/g," ");
+    if(!data.name||!Number.isFinite(data.balance)){toast("Escribe un nombre y un saldo válido");return}
+    const duplicate=countryItems(Array.isArray(state.accounts)?state.accounts:[]).some(x=>x.id!==id&&String(x.name||"").localeCompare(data.name,"es",{sensitivity:"accent"})===0);
+    if(duplicate){toast("Ya existe una cuenta con ese nombre");return}
+  }
   if(kind==="transfer"&&data.from===data.to){toast("El origen y el destino deben ser distintos");return}
   const affectBalance=data.affectBalance==="yes";delete data.affectBalance;
   if(kind==="loan"&&!id)data.balance=data.amount;
@@ -883,10 +944,10 @@ $("#recordForm").onsubmit=async e=>{
   if(id)state[collection]=state[collection].map(x=>x.id===id?{...x,...record}:x);
   else{state[collection].push(record);if(kind==="loan"&&affectBalance)createLoanCashTransaction({loan:record,amount:record.amount,date:record.date,stage:"opening"});}
   setButtonBusy(submitButton,true);
-  if(await saveState(previousState)){closeForm();render();toast(kind==="loan"&&affectBalance?"Préstamo y transacción guardados en Google Sheets":id?"Registro actualizado en Google Sheets":"Registro guardado en Google Sheets")}
+  if(await saveState(previousState)){closeForm();render();toast(kind==="loan"&&affectBalance?"Préstamo y transacción guardados en Google Sheets":kind==="account"?(id?"Cuenta actualizada en Google Sheets":"Cuenta guardada en Google Sheets"):id?"Registro actualizado en Google Sheets":"Registro guardado en Google Sheets")}
   else setButtonBusy(submitButton,false);
 };
-function askDelete(kind,id){pendingDelete={kind,id};let label="este registro";if(kind!=="all"){const collection={transaction:"transactions",budget:"budgets",transfer:"transfers",loan:"loans",recurring:"recurrings"}[kind];const x=state[collection].find(i=>i.id===id);label=x?.description||x?.category||x?.person||"este registro"}$("#confirmText").textContent=kind==="all"?"Se eliminarán todos los datos de la aplicación en Google Sheets.":`Se eliminará “${label}” de Google Sheets. Esta acción no se puede deshacer.`;$("#confirmModal").classList.remove("hidden")}
+function askDelete(kind,id){pendingDelete={kind,id};let label="este registro";if(kind!=="all"){const collection={transaction:"transactions",account:"accounts",budget:"budgets",transfer:"transfers",loan:"loans",recurring:"recurrings"}[kind];const x=state[collection].find(i=>i.id===id);label=x?.name||x?.description||x?.category||x?.person||"este registro"}$("#confirmText").textContent=kind==="all"?"Se eliminarán todos los datos de la aplicación en Google Sheets.":`Se eliminará “${label}” de Google Sheets. Esta acción no se puede deshacer.`;$("#confirmModal").classList.remove("hidden")}
 function askLoanPaymentDelete(loanId,paymentId){
   const loan=state.loans.find(x=>x.id===loanId),payment=loan&&findLoanPayment(loan,paymentId);if(!loan||!payment)return;
   loanDetailReturnContext=loanDetailContext?{...loanDetailContext}:null;hideLoanDetail({preserveContext:true});
@@ -910,7 +971,7 @@ $("#confirmDelete").onclick=async e=>{
     if(!loan||!payment){toast("No se encontró el abono que quieres eliminar");return}
     removeLoanPayment(loan,payment);
   }else{
-    const collection={transaction:"transactions",budget:"budgets",transfer:"transfers",loan:"loans",recurring:"recurrings"}[deleteRequest.kind];
+    const collection={transaction:"transactions",account:"accounts",budget:"budgets",transfer:"transfers",loan:"loans",recurring:"recurrings"}[deleteRequest.kind];
     state[collection]=state[collection].filter(x=>x.id!==deleteRequest.id);
   }
   setButtonBusy(e.currentTarget,true,"Eliminando…");
@@ -944,7 +1005,7 @@ const sidebar=$("#sidebar"),menuButton=$("#menuButton");
 const mobileBottomNav=$("#mobileBottomNav"),mobileMoreButton=$("#mobileMoreButton"),mobileMoreBackdrop=$("#mobileMoreBackdrop"),mobileContextAction=$("#mobileContextAction");
 const usesHamburgerMenu=()=>window.matchMedia("(max-width: 780px)").matches;
 const usesBottomNavigation=()=>window.matchMedia("(max-width: 700px)").matches;
-const mobileMorePages=new Set(["transferencias","prestamos","configuracion"]);
+const mobileMorePages=new Set(["cuentas","transferencias","prestamos","configuracion"]);
 function setMobileMenuOpen(open){
   sidebar.classList.toggle("open",open);
   menuButton.setAttribute("aria-expanded",String(open));
