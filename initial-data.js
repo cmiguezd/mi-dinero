@@ -11,6 +11,7 @@ window.MI_DINERO_INITIAL_DATA = {
   transfers: [],
   loans: [],
   recurrings: [],
+  accounts: [],
   settings: {
     user: "Carlos",
     email: "Cuenta local",

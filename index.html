@@ -28,7 +28,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="styles.css?v=20260804-50">
+  <link rel="stylesheet" href="styles.css?v=20260806-51">
 </head>
 <body>
   <div class="cloud-gate" id="cloudGate" role="status" aria-live="polite">
@@ -45,6 +45,7 @@
       <div class="brand"><span class="brand-mark">$</span><span class="brand-name">Mi Dinero</span></div>
       <nav id="nav">
         <button class="nav-item active" data-page="resumen"><span class="nav-icon"><i class="bi bi-house-door" aria-hidden="true"></i></span><span class="nav-label">Resumen</span></button>
+        <button class="nav-item" data-page="cuentas"><span class="nav-icon"><i class="bi bi-wallet2" aria-hidden="true"></i></span><span class="nav-label">Control de cuentas</span></button>
         <button class="nav-item" data-page="transacciones"><span class="nav-icon"><i class="bi bi-arrow-down-up" aria-hidden="true"></i></span><span class="nav-label">Transacciones</span></button>
         <button class="nav-item" data-page="presupuestos"><span class="nav-icon"><i class="bi bi-pie-chart" aria-hidden="true"></i></span><span class="nav-label">Presupuestos</span></button>
         <button class="nav-item" data-page="transferencias"><span class="nav-icon"><i class="bi bi-arrow-left-right" aria-hidden="true"></i></span><span class="nav-label">Transferencias</span></button>
@@ -132,6 +133,7 @@
         <button type="button" class="icon-button" id="closeMobileMore" aria-label="Cerrar"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
       </div>
       <div class="mobile-more-links">
+        <button type="button" data-mobile-page="cuentas"><i class="bi bi-wallet2" aria-hidden="true"></i><span><strong>Control de cuentas</strong><small>Compara tus saldos reales con el tablero</small></span><i class="bi bi-chevron-right" aria-hidden="true"></i></button>
         <button type="button" data-mobile-page="transferencias"><i class="bi bi-arrow-left-right" aria-hidden="true"></i><span><strong>Transferencias</strong><small>Movimientos entre países</small></span><i class="bi bi-chevron-right" aria-hidden="true"></i></button>
         <button type="button" data-mobile-page="prestamos"><i class="bi bi-cash-coin" aria-hidden="true"></i><span><strong>Préstamos</strong><small>Deudas y cuentas por cobrar</small></span><i class="bi bi-chevron-right" aria-hidden="true"></i></button>
         <button type="button" data-mobile-page="configuracion"><i class="bi bi-gear" aria-hidden="true"></i><span><strong>Configuración</strong><small>Apariencia, categorías y sincronización</small></span><i class="bi bi-chevron-right" aria-hidden="true"></i></button>
@@ -157,7 +159,7 @@
   <div class="toast" id="toast"></div>
   <script src="initial-data.js"></script>
   <script src="cloud-config.js"></script>
-  <script src="app.js?v=20260804-58"></script>
+  <script src="app.js?v=20260806-59"></script>
   <script src="cloud-sync.js?v=20260731-5"></script>
 </body>
 </html>
