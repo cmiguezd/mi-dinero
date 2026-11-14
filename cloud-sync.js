@@ -1,17 +1,51 @@
 (() => {
   const config = window.MI_DINERO_CLOUD_CONFIG || {};
-  const TOKEN_KEY = "mi-dinero-google-token";
+  // El token se guarda con su vencimiento en localStorage para sobrevivir al cierre
+  // de la pestaña o de la app instalada (antes vivía en sessionStorage y se perdía).
+  const TOKEN_KEY = "mi-dinero-google-token-v2";
+  const LEGACY_TOKEN_KEY = "mi-dinero-google-token";
+  const HAD_SESSION_KEY = "mi-dinero-google-had-session";
+  const EXPIRY_SAFETY_MS = 60 * 1000;
+  const RENEW_MARGIN_MS = 10 * 60 * 1000;
+  const TOKEN_REQUEST_TIMEOUT_MS = 90 * 1000;
   const LOCAL_STATE_KEY = "mi-dinero-v3";
   const LOCAL_MIGRATION_KEY = "mi-dinero-cloud-migration-v1";
   const LAST_SYNC_KEY = "mi-dinero-last-sync";
   const POLL_INTERVAL_MS = 10000;
   let tokenClient = null;
+  let renewing = null;
+  let pendingToken = null;
   let syncing = false;
   let pollTimer = null;
   let lastRemoteVersion = localStorage.getItem(LAST_SYNC_KEY) || "";
 
   const configured = () => Boolean(config.clientId && config.spreadsheetId);
-  const getToken = () => sessionStorage.getItem(TOKEN_KEY) || "";
+  function readToken() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(TOKEN_KEY) || "null");
+      if (saved?.token && Number(saved.expiresAt) > Date.now() + EXPIRY_SAFETY_MS) return saved;
+    } catch {}
+    return null;
+  }
+  const getToken = () => readToken()?.token || "";
+  const tokenExpiresSoon = () => {
+    const saved = readToken();
+    return !saved || saved.expiresAt - Date.now() < RENEW_MARGIN_MS;
+  };
+  function storeToken(response) {
+    const lifetime = (Number(response.expires_in) || 3600) * 1000;
+    localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: response.access_token, expiresAt: Date.now() + lifetime }));
+    localStorage.setItem(HAD_SESSION_KEY, "1");
+  }
+  function clearToken() {
+    localStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(LEGACY_TOKEN_KEY);
+  }
+  function authRequired() {
+    const error = new Error("AUTH_REQUIRED");
+    error.code = "AUTH_REQUIRED";
+    return error;
+  }
   const localMigrationPending = () => Boolean(localStorage.getItem(LOCAL_STATE_KEY)) && localStorage.getItem(LOCAL_MIGRATION_KEY) !== "complete";
 
   const setStatus = (text, tone = "") => {
@@ -48,11 +82,13 @@
     const description = error?.error_description || "";
     if (/popup_failed_to_open/i.test(code)) return "El navegador bloqueó la ventana de Google. Habilita las ventanas emergentes y vuelve a intentar.";
     if (/popup_closed/i.test(code)) return "La ventana de Google se cerró antes de autorizar el acceso.";
-    if (/access_denied/i.test(code)) return "Google rechazó el acceso. Entra con carlosmiguez13@gmail.com y acepta los permisos.";
+    if (/AUTH_REQUIRED/i.test(code)) return "Tu sesión de Google venció. Toca la pantalla para renovarla.";
+    if (/TOKEN_TIMEOUT/i.test(code)) return "Google no respondió al renovar la sesión. Vuelve a intentar.";
+    if (/access_denied/i.test(code)) return "Google rechazó el acceso. Entra con tu cuenta y acepta los permisos.";
     if (/invalid_client|origin|redirect_uri_mismatch/i.test(`${code} ${description}`)) return "Google no reconoce este Client ID u origen. Revisa que el cliente sea de tipo Aplicación web y autorice https://cmiguezd.github.io";
     if (/idpiframe_initialization_failed|third.party|cookies/i.test(`${code} ${description}`)) return "El navegador bloqueó las cookies necesarias de Google. Permítelas para accounts.google.com y vuelve a intentar.";
     if (/timeout|tiempo de espera|abort/i.test(`${code} ${description}`)) return "Google Sheets tardó demasiado en responder. Revisa la conexión y vuelve a intentar.";
-    if (/403|PERMISSION_DENIED|insufficientPermissions/i.test(`${code} ${description}`)) return "Google autorizó la cuenta, pero no permitió modificar este archivo. Verifica que carlosmiguez13@gmail.com sea editor del Sheet y vuelve a conectar.";
+    if (/403|PERMISSION_DENIED|insufficientPermissions/i.test(`${code} ${description}`)) return "Google autorizó la cuenta, pero no permitió modificar este archivo. Verifica que tu cuenta sea editora del Sheet y vuelve a conectar.";
     if (/404|NOT_FOUND|Requested entity was not found/i.test(`${code} ${description}`)) return "No se encontró el Google Sheet configurado. Revisa el ID del archivo en Configuración privada.";
     if (/REMOTE_CONFLICT/i.test(code)) return "Google Sheets cambió en otro dispositivo. Ya estamos cargando esa versión; repite la acción cuando termine.";
     return `Error de Google: ${description || code || "no identificado"}`;
@@ -76,24 +112,96 @@
     if (!window.google?.accounts?.oauth2) throw new Error("Google Identity Services no quedó disponible");
   }
 
-  async function requestToken(prompt = "") {
-    await ensureGoogle();
-    return new Promise((resolve, reject) => {
-      tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: config.clientId,
-        scope: "https://www.googleapis.com/auth/spreadsheets",
-        callback: response => {
-          if (response.error) return reject(response);
-          sessionStorage.setItem(TOKEN_KEY, response.access_token);
-          resolve(response.access_token);
-        },
-        error_callback: error => reject(error)
-      });
-      tokenClient.requestAccessToken({ prompt });
-    });
+  function settlePendingToken(error, accessToken) {
+    const pending = pendingToken;
+    pendingToken = null;
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    if (error) pending.reject(error);
+    else pending.resolve(accessToken);
   }
 
-  async function token() { return getToken() || requestToken(""); }
+  function getTokenClient() {
+    if (tokenClient) return tokenClient;
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: config.clientId,
+      scope: "https://www.googleapis.com/auth/spreadsheets",
+      callback: response => {
+        if (response.error) return settlePendingToken(response);
+        storeToken(response);
+        settlePendingToken(null, response.access_token);
+      },
+      error_callback: error => settlePendingToken(error)
+    });
+    return tokenClient;
+  }
+
+  // Debe llamarse de forma síncrona dentro de un toque o clic: si hay un "await"
+  // antes, Safari en iPhone bloquea la ventana de Google. prompt "" solo muestra
+  // la pantalla de permisos la primera vez; después la ventana se cierra sola.
+  function requestToken(prompt = "") {
+    if (renewing) return renewing;
+    if (!window.google?.accounts?.oauth2) {
+      return ensureGoogle().then(() => requestToken(prompt));
+    }
+    renewing = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const error = new Error("TOKEN_TIMEOUT");
+        error.code = "TOKEN_TIMEOUT";
+        settlePendingToken(error);
+      }, TOKEN_REQUEST_TIMEOUT_MS);
+      pendingToken = { resolve, reject, timer };
+      try {
+        getTokenClient().requestAccessToken({ prompt });
+      } catch (error) {
+        settlePendingToken(error);
+      }
+    }).finally(() => { renewing = null; });
+    return renewing;
+  }
+
+  // Nunca abre la ventana de Google por su cuenta (desde un temporizador quedaba
+  // bloqueada y el guardado se quedaba "cargando"). Si no hay token válido, falla
+  // con AUTH_REQUIRED y la renovación ocurre en el siguiente toque del usuario.
+  async function token() {
+    if (renewing) {
+      try { await renewing; } catch {}
+    }
+    const current = getToken();
+    if (current) return current;
+    throw authRequired();
+  }
+
+  function markSessionExpired() {
+    clearToken();
+    stopAutoSync();
+    setStatus(friendlyError(authRequired()), "error");
+  }
+
+  function isActivationEvent(event) {
+    if (event.type === "keydown") return event.key !== "Escape";
+    if (event.type === "pointerdown") return event.pointerType === "mouse";
+    if (event.type === "pointerup") return event.pointerType !== "mouse";
+    return false;
+  }
+
+  // Renueva el token aprovechando un toque normal del usuario cuando le quedan
+  // menos de 10 minutos, para que al guardar ya esté vigente.
+  function renewOnGesture(event) {
+    if (!isActivationEvent(event)) return;
+    if (!configured() || renewing || !window.google?.accounts?.oauth2) return;
+    if (document.documentElement.dataset.cloudBoot !== "ready") return;
+    if (!localStorage.getItem(HAD_SESSION_KEY) || !tokenExpiresSoon()) return;
+    const wasExpired = !getToken();
+    requestToken("").then(() => {
+      setStatus("Sesión de Google renovada", "ok");
+      startAutoSync();
+      if (wasExpired) checkForUpdates();
+    }).catch(error => {
+      console.error("Google token renewal:", error);
+      setStatus(friendlyError(error), "error");
+    });
+  }
 
   async function fetchWithTimeout(url, options = {}, timeoutMs = 25000) {
     const controller = new AbortController();
@@ -114,10 +222,10 @@
       ...options,
       headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", ...(options.headers || {}) }
     });
-    let response = await run(await token());
+    const response = await run(await token());
     if (response.status === 401) {
-      sessionStorage.removeItem(TOKEN_KEY);
-      response = await run(await requestToken(""));
+      markSessionExpired();
+      throw authRequired();
     }
     if (!response.ok) {
       const detail = await response.text();
@@ -198,11 +306,18 @@
       setStatus(error.message, "error");
       throw error;
     }
+    if (renewing) {
+      try { await renewing; } catch {}
+    }
     if (!getToken()) {
-      const error = new Error("Tu sesión de Google no está activa. Vuelve a conectar antes de guardar.");
-      setStatus(error.message, "error");
-      setBootState("auth", "Inicia sesión para guardar y consultar la última versión de Google Sheets.");
+      const error = authRequired();
+      setStatus(friendlyError(error), "error");
       throw error;
+    }
+    // Si hay una consulta en curso (p. ej. justo tras renovar la sesión), se espera
+    // en vez de descartar el guardado.
+    for (let waited = 0; syncing && waited < 30000; waited += 150) {
+      await new Promise(resolve => setTimeout(resolve, 150));
     }
     if (syncing) {
       const error = new Error("Hay otra sincronización en curso. Espera un momento y vuelve a intentar.");
@@ -248,6 +363,7 @@
   }
 
   async function checkForUpdates() {
+    if (configured() && !getToken() && pollTimer) markSessionExpired();
     if (!configured() || !getToken() || syncing || document.hidden || hasBlockingDialog()) return;
     try {
       const result = await api(`${versionRange()}?majorDimension=COLUMNS`);
@@ -275,19 +391,19 @@
     pollTimer = null;
   }
 
-  async function connect() {
-    try {
-      setBootState("loading", "Iniciando sesión y consultando la última versión de Google Sheets…");
-      setStatus("Conectando con Google…");
-      await requestToken("consent select_account");
-      await pull({ initial: true });
-      window.miDineroRefresh?.();
-    } catch (error) {
-      console.error("Google OAuth:", error);
-      const message = configured() ? friendlyError(error) : "Falta configurar Google OAuth";
-      setStatus(message, "error");
-      setBootState("error", message);
-    }
+  // Sin "await" antes de requestToken para conservar el gesto del usuario.
+  function connect(prompt = "") {
+    setBootState("loading", "Iniciando sesión y consultando la última versión de Google Sheets…");
+    setStatus("Conectando con Google…");
+    return requestToken(prompt)
+      .then(() => pull({ initial: true }))
+      .then(() => window.miDineroRefresh?.())
+      .catch(error => {
+        console.error("Google OAuth:", error);
+        const message = configured() ? friendlyError(error) : "Falta configurar Google OAuth";
+        setStatus(message, "error");
+        setBootState("error", message);
+      });
   }
 
   async function migrateLocal() {
@@ -301,7 +417,8 @@
   function disconnect() {
     const current = getToken();
     if (current && window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(current);
-    sessionStorage.removeItem(TOKEN_KEY);
+    clearToken();
+    localStorage.removeItem(HAD_SESSION_KEY);
     stopAutoSync();
     setStatus("Desconectado de Google Sheets", "error");
     showLogin();
@@ -311,6 +428,10 @@
   async function bootstrap() {
     const gateButton = document.querySelector("#cloudGateConnect");
     if (gateButton) gateButton.onclick = () => connect();
+    sessionStorage.removeItem(LEGACY_TOKEN_KEY);
+    for (const type of ["pointerdown", "pointerup", "keydown"]) {
+      document.addEventListener(type, renewOnGesture, true);
+    }
     window.addEventListener("focus", checkForUpdates);
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) checkForUpdates();
@@ -320,6 +441,8 @@
       setBootState("ready");
       return;
     }
+    // Precarga Google para que el botón abra la ventana sin esperas (iPhone).
+    ensureGoogle().catch(error => console.error("Google Identity Services:", error));
     if (!getToken()) {
       setStatus("Inicia sesión para cargar Google Sheets");
       showLogin();
@@ -331,7 +454,7 @@
 
   window.MiDineroCloud = {
     configured, connect, disconnect, pull, push, migrateLocal, localMigrationPending,
-    isConnected: () => Boolean(getToken()), friendlyError, checkForUpdates, showLogin
+    isConnected: () => Boolean(getToken() || renewing), friendlyError, checkForUpdates, showLogin
   };
   setStatus(configured() ? getToken() ? "Conectando con Google Sheets…" : "Inicia sesión para cargar Google Sheets" : "Falta configurar Google OAuth");
   bootstrap();
