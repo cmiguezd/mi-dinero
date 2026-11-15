@@ -6,7 +6,7 @@
   --bg: #0a0b0e; --panel: #111318; --panel2: #16181e; --line: #23262e; --line2: #2a2e38;
   --text: #f5f5f7; --muted: #9a9cb0; --faint: #6c6f7d;
   --accent: #c6f432; --accent-ink: #d4ff4a; --accent-soft: rgba(198, 244, 50, .10); --on-accent: #0a0b0e; --purple: #c6f432;
-  --inc: #3d7bff; --exp: #f5b800; --snd: #e5482a; --loan: #8b93a7; --adj: #6c6f7d; --saldo: #c6f432;
+  --inc: #3d7bff; --exp: #f5b800; --snd: #e5482a; --loan: #8b93a7; --adj: #6c6f7d; --saldo: #c6f432; --open: #4b5262;
   --inc-ink: #9fbaff; --exp-ink: #ffd966;
   --good: #65d6a4; --warn: #ff8a00; --warn-ink: #ffb366; --bad: #f04438; --bad-ink: #ff9b8f;
   --green: #65d6a4; --red: #ff7c7c; --yellow: #ffcc4d; --blue: #7aa5ff;
@@ -18,7 +18,7 @@ html[data-theme="light"] {
   --bg: #f3f4f6; --panel: #ffffff; --panel2: #f0f1f4; --line: #e2e4e9; --line2: #d5d8df;
   --text: #15171c; --muted: #5f6370; --faint: #8a8d99;
   --accent: #c6f432; --accent-ink: #4d7c0f; --accent-soft: rgba(132, 184, 20, .14); --on-accent: #0a0b0e; --purple: #c6f432;
-  --inc: #2563eb; --exp: #c98a00; --snd: #d63d1f; --loan: #7a8194; --adj: #9a9da8; --saldo: #5a8f0e;
+  --inc: #2563eb; --exp: #c98a00; --snd: #d63d1f; --loan: #7a8194; --adj: #9a9da8; --saldo: #5a8f0e; --open: #aeb3bf;
   --inc-ink: #1d4ed8; --exp-ink: #8a5d00;
   --good: #15803d; --warn: #c2410c; --warn-ink: #c2410c; --bad: #dc2626; --bad-ink: #b91c1c;
   --green: #15803d; --red: #dc2626; --yellow: #8a5d00; --blue: #1d4ed8;
@@ -60,6 +60,8 @@ html[data-theme="light"] body[data-country] .button.ghost:hover { border-color: 
 .dz-dot.is-inc { background: var(--inc); } .dz-dot.is-exp { background: var(--exp); } .dz-dot.is-snd { background: var(--snd); }
 .dz-dot.is-loan { background: repeating-linear-gradient(135deg, var(--loan) 0 2px, color-mix(in srgb, var(--loan) 45%, var(--bg)) 2px 4px); }
 .dz-dot.is-adj { background: var(--adj); }
+.dz-dot.is-open { background: var(--open); } .dz-dot.is-saldo { background: var(--saldo); }
+.dz-dot.is-gap { background: repeating-linear-gradient(135deg, var(--warn) 0 2px, transparent 2px 4px); border: 1px solid var(--warn); }
 .dz-kpis { display: grid; grid-template-columns: 1.5fr repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
 .dz-card, .dz-panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px; min-width: 0; }
 .dz-card { display: flex; flex-direction: column; gap: 8px; }
@@ -82,14 +84,23 @@ html[data-theme="light"] body[data-country] .button.ghost:hover { border-color: 
 .dz-net { text-align: right; } .dz-net span { display: block; font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
 .dz-net strong { font-size: 20px; color: var(--accent-ink); } .dz-net strong.is-neg { color: var(--bad-ink); }
 .dz-flow { display: flex; flex-direction: column; gap: 10px; }
-.dz-flow-line { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; grid-template-areas: "label bar amount"; gap: 8px 14px; align-items: center; }
+.dz-flow-line { display: grid; grid-template-columns: 118px minmax(0, 1fr) auto; grid-template-areas: "label bar amount"; gap: 8px 14px; align-items: center; }
 .dz-flow-line .dz-flow-label { grid-area: label; } .dz-flow-line .dz-flow-bar { grid-area: bar; } .dz-flow-line > strong { grid-area: amount; text-align: right; }
 .dz-flow-label { font-size: 13px; color: var(--muted); }
 .dz-flow-bar { display: flex; gap: 2px; height: 26px; min-width: 0; }
 .dz-seg { height: 100%; border-radius: 6px; min-width: 3px; }
+.dz-seg.is-open { background: var(--open); } .dz-seg.is-saldo { background: var(--saldo); box-shadow: var(--glow); }
+.dz-seg.is-gap { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--warn) 70%, transparent) 0 4px, transparent 4px 7px); border: 1px solid var(--warn); }
 .dz-seg.is-inc { background: var(--inc); } .dz-seg.is-exp { background: var(--exp); } .dz-seg.is-snd { background: var(--snd); } .dz-seg.is-adj { background: var(--adj); }
 .dz-seg.is-loan { background: repeating-linear-gradient(135deg, var(--loan) 0 4px, color-mix(in srgb, var(--loan) 40%, var(--bg)) 4px 7px); }
-.dz-flow-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; padding-top: 14px; border-top: 1px solid var(--line); }
+.dz-flow-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.dz-legend-group { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.dz-legend-group em { font-style: normal; font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--faint); }
+.dz-eq { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; border-radius: 14px; background: var(--panel2); border: 1px solid var(--line); }
+.dz-eq > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.dz-eq span { font-size: 11px; color: var(--muted); display: flex; align-items: center; } .dz-eq strong { font-size: 15px; }
+.dz-eq .is-result strong { color: var(--accent-ink); font-size: 17px; }
+.dz-op { font-size: 18px; color: var(--faint); font-weight: 500; }
 .dz-flow-legend div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .dz-flow-legend span { font-size: 12px; color: var(--muted); display: flex; align-items: center; }
 .dz-flow-legend strong { font-size: 16px; } .dz-flow-legend small { font-size: 11px; color: var(--faint); }
@@ -261,6 +272,10 @@ html[data-theme="light"] .dz-line-path { filter: none; }
   .dz-flow-bar { height: 22px; }
   .dz-head .dz-net { text-align: left; }
   .dz-flow-legend { grid-template-columns: minmax(0, 1fr); }
+  .dz-eq { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; }
+  .dz-eq > div { flex-direction: row; justify-content: space-between; align-items: baseline; grid-column: 1 / -1; }
+  .dz-op { display: none; }
+  .dz-eq .is-result { border-top: 1px solid var(--line2); padding-top: 6px; }
   .dz-months { grid-template-columns: repeat(12, minmax(0, 1fr)); height: 200px; }
   .dz-month-net { font-size: 0; } .dz-month.is-selected .dz-month-net { font-size: 9.5px; overflow: visible; }
   .dz-month-label { font-size: 9.5px; }
