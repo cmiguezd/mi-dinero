@@ -290,7 +290,7 @@
           try {
             await push(recurringChecksMigration);
             window.miDineroCompleteRecurringChecksMigration?.();
-            setStatus("Checks anteriores recuperados y guardados en Google Sheets", "ok");
+            setStatus("Datos actualizados y guardados en Google Sheets", "ok");
           } catch (error) {
             console.error("Recurring checks migration:", error);
           }

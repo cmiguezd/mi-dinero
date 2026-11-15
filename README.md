@@ -1,30 +1,32 @@
 # Mi Dinero
 
-Aplicación web estática de finanzas personales, preparada para GitHub Pages.
+Aplicación web de finanzas familiares (China y Colombia), publicada en GitHub Pages:
+https://cmiguezd.github.io/mi-dinero/
+
+## Cómo funciona
+
+- **Datos:** se guardan en un Google Sheet privado (hoja oculta `_AppState`) y se
+  sincronizan entre dispositivos. El repositorio público no contiene datos financieros
+  ni credenciales.
+- **Sesión de Google:** el token dura una hora y se renueva con el siguiente toque.
+- **Archivos principales:**
+  - `app.js`: estado, cálculos (cierres de mes, saldos, préstamos) y pantallas.
+  - `ui.js`: gráficos, formularios, atajos por uso histórico y separación comercio/detalle.
+  - `cloud-sync.js`: conexión con Google Sheets.
+  - `styles.css` + `theme.css`: estilos (tema grafito con verde neón y amarillo).
+
+## Pruebas de cálculos
+
+Antes de publicar cambios que toquen la lógica:
+
+```sh
+sh tests/run.sh
+```
+
+Compara los resultados de todas las funciones de cálculo, con datos sintéticos de
+13 meses, contra `tests/golden.json`. Si algo cambia, muestra la diferencia.
 
 ## Publicación
 
-La rama `main` contiene directamente el sitio. GitHub Pages debe configurarse
-con **Deploy from a branch**, usando la rama `main` y la carpeta `/ (root)`.
-
-La URL esperada es:
-
-https://cmiguezd.github.io/mi-dinero/
-
-## Privacidad y datos
-
-Este repositorio público no contiene movimientos, presupuestos, transferencias,
-préstamos, respaldos ni credenciales.
-
-La aplicación guarda la información en `localStorage` del navegador. Desde
-**Configuración** se puede importar o exportar un respaldo JSON. Los datos
-importados permanecen solamente en ese navegador y no se suben a GitHub.
-
-Para sincronizar varios dispositivos será necesario conectar un backend privado
-autenticado. Las credenciales de Google Drive o Google Sheets nunca deben
-incluirse en este repositorio ni en el JavaScript del navegador.
-
-## Desarrollo local
-
-No requiere compilación. Abre `index.html` o sirve la carpeta con cualquier
-servidor HTTP estático.
+GitHub Pages publica la rama `main` desde la raíz. Los cambios se hacen en una rama
+y entran por Pull Request.
