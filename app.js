@@ -31,9 +31,9 @@ const meta = {
 const fallbackCategories = ["Alimentación","Vivienda","Transporte","Servicios","Salud","Compras","Entretenimiento","Viajes","Educación","Comisión bancaria","Otros"];
 const pageNames={resumen:"Resumen",cuentas:"Cuentas",transacciones:"Transacciones",presupuestos:"Presupuestos",transferencias:"Transferencias",prestamos:"Préstamos",recurrentes:"Recurrentes",configuracion:"Configuración"};
 const mobilePrimaryActions={
-  resumen:{kind:"transaction",label:"Nueva transacción"},
+  resumen:{kind:"transaction",label:"Nuevo movimiento"},
   cuentas:{kind:"account",label:"Nueva cuenta"},
-  transacciones:{kind:"transaction",label:"Nueva transacción"},
+  transacciones:{kind:"transaction",label:"Nuevo movimiento"},
   presupuestos:{kind:"budget",label:"Nuevo presupuesto"},
   recurrentes:{kind:"recurring",label:"Nuevo recurrente"},
   transferencias:{kind:"transfer",label:"Nueva transferencia"},
@@ -185,7 +185,7 @@ function applyTheme(theme=colorTheme){
   document.documentElement.dataset.theme=colorTheme;
   document.documentElement.style.colorScheme=colorTheme;
   const themeColor=document.querySelector('meta[name="theme-color"]');
-  if(themeColor)themeColor.content=colorTheme==="light"?"#f4f5f8":"#101117";
+  if(themeColor)themeColor.content=colorTheme==="light"?"#f3f4f6":"#0a0b0e";
 }
 applyTheme();
 
@@ -349,22 +349,16 @@ function totals(tx=countryItems(state.transactions)){
   return {income,expense,balance:income-expense,count:tx.length};
 }
 function renderDashboard(){
-  const tx=dashboardTransactions(), categoryTx=dashboardTransactions({ignoreCategory:true}), timelineTx=dashboardTransactions({ignoreCategory:true}), t=totals(tx), allTime=totals(), balance=monthlyBalanceReconciliation(t);
-  const groups=expenseGroups(categoryTx), selectedGroups=expenseGroups(tx), merchants=merchantGroups(dashboardTransactions({ignoreMerchant:true})), categoryTotal=totals(categoryTx).expense, flexible=selectedGroups.filter(([c])=>isFlexibleCategory(c)).reduce((a,[,v])=>a+v,0);
-  const largest=tx.filter(x=>x.type==="gasto").sort((a,b)=>Number(b.amount)-Number(a.amount)).slice(0,5);
-  const monthNames=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-  return `${pageHead("¿En qué se está yendo tu dinero?",`Análisis de ${periodLabel()} en ${meta[state.country].name}.`,`<button class="button" data-add="transaction"><i class="bi bi-plus-lg" aria-hidden="true"></i>Nueva transacción</button>`)}
-  ${balance?balanceReconciliation(balance):`<div class="balance-note"><span>Balance acumulado de movimientos clasificados</span><strong>${money(allTime.balance)}</strong><small>Entradas menos gastos de ${meta[state.country].name}; no representa un saldo bancario conciliado.</small></div>`}
-  <div class="analysis-grid analysis-grid-three">
-    <div class="panel category-panel"><div class="panel-head"><div><h3>Participación por categoría</h3><small>Qué categorías concentran el gasto</small></div></div>${categoryParticipation(groups,categoryTotal)}</div>
-    <div class="panel timeline-panel"><div class="panel-head"><div><h3>${dashboardMonth==="all"?"Gasto por mes":"Gasto por semana"}</h3><small>Valores del periodo seleccionado</small></div></div>${spendingTimeline(timelineTx)}</div>
-    <div class="panel category-panel merchant-panel"><div class="panel-head"><div><h3>Gasto por nombre</h3><small>Top 10 por frecuencia, ordenado por valor gastado</small></div></div>${merchantParticipation(merchants)}</div>
-  </div>
-  <div class="analysis-grid lower">
-    <div class="panel"><div class="panel-head"><div><h3>Gastos con margen de ajuste</h3><small>Restaurantes, compras, ocio y categorías similares</small></div></div>${flexibleBreakdown(selectedGroups,t.expense)}</div>
-    <div class="panel"><div class="panel-head"><h3>Mayores gastos individuales</h3><button class="button ghost" data-go="transacciones">Ver todos</button></div>${largest.length?transactionRows(largest):empty("Sin gastos","No hay salidas en este periodo.")}</div>
-  </div>
-  <div class="panel daily-balance-panel"><div class="panel-head"><div><h3>Saldo día a día</h3><small>${dashboardMonth==="all"?"Selecciona un mes para ver cómo fluctuó tu saldo.":"Saldo conciliado al cierre de cada día; incluye entradas, gastos, transferencias y conciliación mensual."}</small></div></div>${dailyBalanceChart()}</div>`;
+  const months=periodMonths(),prev=previousPeriodMonths();
+  const flow=monthFlow(months),prevFlow=monthFlow(prev.months),balance=periodBalance();
+  const categoryTx=dashboardTransactions({ignoreCategory:true}),groups=expenseGroups(categoryTx),catTotal=totals(categoryTx).expense;
+  const prevTx=countryItems(state.transactions).filter(x=>x.date&&prev.months.includes(x.date.slice(0,7))&&(!dashboardMerchant||merchantKey(x.description)===dashboardMerchant));
+  const merchantTx=dashboardTransactions({ignoreMerchant:true}),merchants=merchantGroups(merchantTx);
+  return `${pageHead("¿En qué se está yendo tu dinero?",`${periodLabel()} en ${meta[state.country].name}.`,`<button class="button" data-add="transaction"><i class="bi bi-plus-lg" aria-hidden="true"></i>Nuevo movimiento</button>`)}
+  ${dashKpis(flow,prevFlow,prev.label,balance)}
+  <div class="dz-row"><div class="dz-col">${flowCard(flow,balance)}${dailyCard()}</div>${categoryCard(groups,catTotal,expenseGroups(prevTx))}</div>
+  <div class="dz-row">${monthlyCard()}${budgetsCard()}</div>
+  ${merchantsCard(merchants,totals(merchantTx).expense)}`;
 }
 function metric(label,value,small,color){return `<article class="metric"><div class="metric-label"><span>${label}</span><i class="dot ${color}"></i></div><div class="metric-value">${value}</div><small>${small}</small></article>`}
 function latestDashboardBalance(country=state.country){
@@ -448,6 +442,7 @@ function accountBrandMark(name){
   return `<span class="account-card-icon account-brand-icon" data-brand="${escapeAttr(brand.key)}" style="--brand-bg:${brand.bg};--brand-fg:${brand.fg}" role="img" aria-label="Logo de ${escapeAttr(brand.label)}">${content}</span>`;
 }
 
+function accountIsStale(value){const t=new Date(value).getTime();return Boolean(value)&&Number.isFinite(t)&&Date.now()-t>7*864e5}
 function accountUpdateLabel(value){
   if(!value)return "Sin actualización registrada";
   const date=new Date(value);if(Number.isNaN(date.getTime()))return "Actualización reciente";
@@ -481,7 +476,7 @@ function renderAccounts(){
       <article class="panel account-summary-card account-difference ${differenceTone}" aria-live="polite"><span>Diferencia por conciliar</span><strong>${differenceValue}</strong><small>${escapeHtml(differenceCopy)}</small></article>
     </section>
     <div class="account-section-head"><div><h3>Tus cuentas en ${meta[state.country].name}</h3><p class="muted">Edita el saldo cada vez que quieras comprobarlo. El valor anterior será reemplazado.</p></div></div>
-    <section class="account-grid">${items.length?items.map(item=>`<article class="panel account-card"><div class="account-card-top">${accountBrandMark(item.name)}<div class="row-actions"><button data-edit="account" data-id="${item.id}" title="Editar cuenta" aria-label="Editar ${escapeAttr(item.name)}"><i class="bi bi-pencil-square" aria-hidden="true"></i></button><button data-delete="account" data-id="${item.id}" title="Eliminar cuenta" aria-label="Eliminar ${escapeAttr(item.name)}"><i class="bi bi-trash3" aria-hidden="true"></i></button></div></div><h3>${escapeHtml(item.name)}</h3><strong class="account-card-balance">${money(item.balance)}</strong><small>${escapeHtml(accountUpdateLabel(item.updatedAt))}</small></article>`).join(""):empty("Aún no tienes cuentas registradas",`Agrega bancos, billeteras o efectivo de ${meta[state.country].name} para comparar su total.`)}</section>`;
+    <section class="account-grid">${items.length?items.map(item=>`<article class="panel account-card"><div class="account-card-top">${accountBrandMark(item.name)}<div class="row-actions"><button data-edit="account" data-id="${item.id}" title="Editar cuenta" aria-label="Editar ${escapeAttr(item.name)}"><i class="bi bi-pencil-square" aria-hidden="true"></i></button><button data-delete="account" data-id="${item.id}" title="Eliminar cuenta" aria-label="Eliminar ${escapeAttr(item.name)}"><i class="bi bi-trash3" aria-hidden="true"></i></button></div></div><h3>${escapeHtml(item.name)}</h3><strong class="account-card-balance">${money(item.balance)}</strong><small class="${accountIsStale(item.updatedAt)?"is-stale":""}">${escapeHtml(accountUpdateLabel(item.updatedAt))}${accountIsStale(item.updatedAt)?" · actualízala antes de conciliar":""}</small></article>`).join(""):empty("Aún no tienes cuentas registradas",`Agrega bancos, billeteras o efectivo de ${meta[state.country].name} para comparar su total.`)}</section>`;
 }
 function chartMoney(value){
   const decimals=state.country==="CO"?0:2;
@@ -622,13 +617,20 @@ function flexibleBreakdown(groups,total){
   const max=Math.max(...items.map(([,v])=>v));
   return `<div class="rank-list">${items.map(([c,v],i)=>`<div class="rank-item"><span class="rank-number">${i+1}</span><div><div class="rank-label"><strong>${escapeHtml(c)}</strong><span>${money(v)} · ${total?Math.round(v/total*100):0}%</span></div><div class="rank-track"><i style="width:${v/max*100}%"></i></div></div></div>`).join("")}</div>`;
 }
+function transactionTotalsHtml(tx){
+  const exp=tx.filter(x=>x.type==="gasto"),expSum=exp.reduce((a,x)=>a+(Number(x.amount)||0),0);
+  const incSum=tx.filter(x=>x.type==="ingreso"||x.type==="cobro").reduce((a,x)=>a+(Number(x.amount)||0),0);
+  return `<div><span>Movimientos</span><strong class="num">${tx.length}</strong></div><div><span><i class="dz-dot is-exp" aria-hidden="true"></i>Gastos</span><strong class="num">${money(expSum)}</strong></div><div><span><i class="dz-dot is-inc" aria-hidden="true"></i>Ingresos y reembolsos</span><strong class="num">${money(incSum)}</strong></div><div><span>Gasto promedio</span><strong class="num">${exp.length?money(expSum/exp.length):"—"}</strong></div>`;
+}
 function renderTransactions(){
   const tx=dashboardTransactions({ignoreCategory:true}).sort((a,b)=>b.date.localeCompare(a.date)||Number(b.amount||0)-Number(a.amount||0));
-  const categories=[...new Set(tx.map(x=>x.category||"Sin categoría"))].sort((a,b)=>a.localeCompare(b,"es"));
-  const actions=`<div class="page-head-actions"><button class="button ghost" type="button" id="exportTransactions"><i class="bi bi-download" aria-hidden="true"></i>Exportar Excel</button><button class="button" data-add="transaction"><i class="bi bi-plus-lg" aria-hidden="true"></i>Nueva transacción</button></div>`;
+  const used={};tx.forEach(x=>{const c=x.category||"Sin categoría";used[c]=(used[c]||0)+1});
+  const categories=Object.keys(used).sort((a,b)=>used[b]-used[a]||a.localeCompare(b,"es"));
+  const actions=`<div class="page-head-actions"><button class="button ghost" type="button" id="exportTransactions"><i class="bi bi-download" aria-hidden="true"></i>Exportar Excel</button><button class="button" data-add="transaction"><i class="bi bi-plus-lg" aria-hidden="true"></i>Nuevo movimiento</button></div>`;
   return `${pageHead("Todos tus movimientos",`<span id="transactionCount">${tx.length}</span> registros de ${periodLabel()} en ${meta[state.country].name}.`,actions)}
-  <div class="filters transaction-filters"><input class="input" id="searchTx" placeholder="Buscar por descripción o categoría" aria-label="Buscar transacciones"><select class="select" id="typeFilter" aria-label="Filtrar por tipo"><option value="">Todos los tipos</option><option value="gasto">Gastos</option><option value="ingreso">Ingresos</option><option value="cobro">Cobros</option><option value="ajuste">Ajustes</option></select><select class="select" id="categoryFilter" aria-label="Filtrar por categoría"><option value="">Todas las categorías</option>${categories.map(category=>`<option value="${escapeAttr(category)}">${escapeHtml(category)}</option>`).join("")}</select></div>
-  <div class="panel table-panel" id="txList">${tx.length?transactionRows(tx):empty("Aún no hay transacciones","Registra un gasto, ingreso, cobro o ajuste.")}</div>`;
+  <div class="filters transaction-filters"><input class="input" id="searchTx" placeholder="Buscar comercio, detalle o categoría" aria-label="Buscar transacciones"><select class="select" id="typeFilter" aria-label="Filtrar por tipo"><option value="">Todos los tipos</option><option value="gasto">Gastos</option><option value="ingreso">Ingresos</option><option value="cobro">Reembolsos</option><option value="ajuste">Ajustes</option></select><select class="select" id="categoryFilter" aria-label="Filtrar por categoría"><option value="">Todas las categorías</option>${categories.map(category=>`<option value="${escapeAttr(category)}">${escapeHtml(category)} · ${used[category]}</option>`).join("")}</select></div>
+  <div class="tx-totals" id="txTotals" aria-live="polite">${transactionTotalsHtml(tx)}</div>
+  <div class="panel table-panel" id="txList">${tx.length?transactionRows(tx,{grouped:true}):empty("Aún no hay transacciones","Registra un gasto, ingreso, cobro o ajuste.")}</div>`;
 }
 function loanPaymentLinkedToTransaction(transaction){
   if(transaction.loanStage!=="payment"||!transaction.loanId)return null;
@@ -636,24 +638,50 @@ function loanPaymentLinkedToTransaction(transaction){
   const payment=loanPaymentHistory(loan).find(x=>x.transactionId===transaction.id);if(!payment)return null;
   return {loan,payment};
 }
-function transactionRows(tx){return `<div class="transaction-list">${tx.map(x=>{
+function transactionRows(tx,{grouped=false}={}){let lastDay="";return `<div class="transaction-list">${tx.map(x=>{
+  let dayHead="";
+  if(grouped&&x.date!==lastDay){lastDay=x.date;const dayTx=tx.filter(t=>t.date===x.date),net=dayTx.reduce((a,t)=>a+(t.type==="gasto"?-Number(t.amount||0):t.type==="ajuste"?0:Number(t.amount||0)),0),label=new Intl.DateTimeFormat("es",{weekday:"long",day:"numeric",month:"long",timeZone:"UTC"}).format(new Date(`${x.date}T12:00:00Z`));dayHead=`<div class="tx-day" data-day="${escapeAttr(x.date)}"><span>${escapeHtml(label.charAt(0).toUpperCase()+label.slice(1))}</span><span class="num">${net?signedMoney(net):""}</span></div>`}
   const linkedPayment=loanPaymentLinkedToTransaction(x);
   const actions=linkedPayment
     ?`<div class="row-actions"><button data-edit-loan-payment="${linkedPayment.payment.id}" data-loan-id="${linkedPayment.loan.id}" title="Editar abono vinculado" aria-label="Editar abono vinculado"><i class="bi bi-pencil-square" aria-hidden="true"></i></button><button data-delete-loan-payment="${linkedPayment.payment.id}" data-loan-id="${linkedPayment.loan.id}" title="Eliminar abono vinculado" aria-label="Eliminar abono vinculado"><i class="bi bi-trash3" aria-hidden="true"></i></button></div>`
     :`<div class="row-actions"><button data-edit="transaction" data-id="${x.id}" title="Editar"><i class="bi bi-pencil-square" aria-hidden="true"></i></button><button data-delete="transaction" data-id="${x.id}" title="Eliminar"><i class="bi bi-trash3" aria-hidden="true"></i></button></div>`;
-  return `<div class="transaction-row" data-transaction-id="${x.id}" data-search="${escapeAttr(`${x.description||""} ${x.category||""} ${x.type||""}`.toLocaleLowerCase("es"))}" data-type="${escapeAttr(x.type||"")}" data-category="${escapeAttr(x.category||"Sin categoría")}"><div class="tx-icon"><i class="bi ${x.type==="gasto"?"bi-arrow-down":"bi-arrow-up"}" aria-hidden="true"></i></div><div><strong>${escapeHtml(x.description)}</strong><small>${escapeHtml(x.category)} · ${dateLabel(x.date)}</small></div><span class="amount ${x.type}">${x.type==="gasto"?"−":"+"}${money(x.amount,x.country)}</span>${actions}</div>`;
+  return `${dayHead}<div class="transaction-row" data-transaction-id="${x.id}" data-search="${escapeAttr(`${x.description||""} ${x.detail||""} ${x.category||""} ${x.type||""}`.toLocaleLowerCase("es"))}" data-type="${escapeAttr(x.type||"")}" data-category="${escapeAttr(x.category||"Sin categoría")}" data-date="${escapeAttr(x.date||"")}"><div class="tx-icon is-${escapeAttr(x.type||"")}"><i class="bi ${x.type==="gasto"?"bi-arrow-down":x.type==="ajuste"?"bi-sliders":"bi-arrow-up"}" aria-hidden="true"></i></div><div><strong>${escapeHtml(x.description)}</strong><small>${x.detail?`${escapeHtml(x.detail)} · `:""}${escapeHtml(x.category)}${grouped?"":` · ${dateLabel(x.date)}`}</small></div><span class="amount ${x.type}">${x.type==="gasto"?"−":x.type==="ajuste"?"":"+"}${money(x.amount,x.country)}</span>${actions}</div>`;
 }).join("")}</div>`}
 function spentByCategory(category){return dashboardTransactions({ignoreCategory:true}).filter(x=>x.type==="gasto"&&x.category===category).reduce((a,b)=>a+Number(b.amount),0)}
 function renderBudgets(){
-  const items=countryItems(state.budgets);
-  const months=dashboardMonth==="all"?12:1;
-  return `${pageHead("Presupuestos",`Límites y gastos de ${periodLabel()} en ${meta[state.country].name}.`,`<button class="button" data-add="budget"><i class="bi bi-plus-lg" aria-hidden="true"></i>Nuevo presupuesto</button>`)}
-  <div class="budget-grid">${items.length?items.map(x=>{const monthly=Number(x.amount)||0,limit=monthly*months,spent=spentByCategory(x.category),rawPct=limit?Math.round(spent/limit*100):0,pct=Math.min(100,rawPct);return `<article class="panel budget-card"><div class="budget-top"><div><small class="muted">${escapeHtml(x.category)} · ${escapeHtml(periodLabel())}</small><h3>${money(limit)}</h3><small class="muted">${dashboardMonth==="all"?`${money(monthly)} al mes × 12 meses`:"Límite mensual"}</small></div><div class="row-actions"><button data-edit="budget" data-id="${x.id}"><i class="bi bi-pencil-square" aria-hidden="true"></i></button><button data-delete="budget" data-id="${x.id}"><i class="bi bi-trash3" aria-hidden="true"></i></button></div></div><div class="progress"><span style="width:${pct}%;background:${rawPct>100?"var(--red)":"var(--green)"}"></span></div><div class="budget-values"><span>Usado ${money(spent)}</span><span>${rawPct}%</span></div></article>`}).join(""):empty("Sin presupuestos","Define un límite para comenzar.")}</div>`;
+  const items=countryItems(state.budgets),pace=budgetPace(),months=dashboardMonth==="all"?12:1;
+  const spentAll=items.reduce((s,x)=>s+spentByCategory(x.category),0),limitAll=items.reduce((s,x)=>s+(Number(x.amount)||0)*months,0);
+  const projOf=x=>{const spent=spentByCategory(x.category);return pace&&pace.ratio>0&&!budgetIsFixed(x.category)?spent/pace.ratio:spent};
+  const risky=items.filter(x=>projOf(x)>(Number(x.amount)||0)*months*1.001);
+  const summary=items.length?`<section class="bd-summary">
+    <article class="dz-card"><p class="dz-eyebrow">Gastado de lo presupuestado</p><strong class="dz-value num">${money(spentAll)} <small>de ${money(limitAll)}</small></strong><div class="dz-bullet">${pace?`<span class="dz-bullet-today" style="left:${(pace.ratio*100).toFixed(2)}%"></span>`:""}<span class="dz-bullet-fill" style="width:${limitAll?Math.min(100,spentAll/limitAll*100).toFixed(2):0}%"></span></div><p class="dz-sub">${pace?`Día ${pace.day} de ${pace.days} · la línea marca hoy`:periodLabel()}</p></article>
+    <article class="dz-card"><p class="dz-eyebrow">${pace?"Proyección al cierre":"Total del periodo"}</p><strong class="dz-value num">${money(items.reduce((s,x)=>s+projOf(x),0))}</strong><p class="dz-sub">${pace?"Si sigues gastando al ritmo actual":"Gastado en categorías con presupuesto"}</p></article>
+    <article class="dz-card ${risky.length?"is-risk":""}"><p class="dz-eyebrow">${risky.length?"En riesgo":"Todo en orden"}</p><strong class="dz-value">${risky.length?`${risky.length} ${risky.length===1?"categoría":"categorías"}`:"Sin alertas"}</strong><p class="dz-sub">${risky.length?escapeHtml(risky.map(x=>x.category).join(", "))+(pace?" superarían su límite":" superaron su límite"):"Ningún presupuesto va a pasarse"}</p></article>
+  </section>`:"";
+  return `${pageHead("Presupuestos",`¿Cómo vas a terminar ${periodLabel().toLowerCase()}? · ${meta[state.country].name}`,`<button class="button" data-add="budget"><i class="bi bi-plus-lg" aria-hidden="true"></i>Nuevo presupuesto</button>`)}
+  ${summary}
+  <div class="budget-grid">${items.length?items.map(x=>`<article class="panel budget-card bd-card"><div class="row-actions bd-actions"><button data-edit="budget" data-id="${x.id}" aria-label="Editar presupuesto de ${escapeAttr(x.category)}"><i class="bi bi-pencil-square" aria-hidden="true"></i></button><button data-delete="budget" data-id="${x.id}" aria-label="Eliminar presupuesto de ${escapeAttr(x.category)}"><i class="bi bi-trash3" aria-hidden="true"></i></button></div>${budgetRow(x)}</article>`).join(""):empty("Sin presupuestos","Define un límite para comenzar.")}</div>
+  ${pace&&items.length?`<p class="bd-legend"><span><i class="is-fill"></i>Gastado</span><span><i class="is-proj"></i>Proyección al cierre</span><span><i class="is-limit"></i>Límite</span></p>`:""}`;
 }
 function renderTransfers(){
   const items=state.transfers.filter(x=>x.from===state.country||x.to===state.country).sort((a,b)=>b.date.localeCompare(a.date));
-  return `${pageHead("Transferencias",`Movimientos vinculados que no cuentan como ingreso ni gasto.`,`<button class="button" data-add="transfer"><i class="bi bi-plus-lg" aria-hidden="true"></i>Nueva transferencia</button>`)}
-  <div class="panel table-panel">${items.length?`<div class="transaction-list">${items.map(x=>`<div class="transaction-row"><div class="tx-icon"><i class="bi bi-arrow-left-right" aria-hidden="true"></i></div><div><strong>${meta[x.from].name} → ${meta[x.to].name}</strong><small>${dateLabel(x.date)} · Comisión ${money(x.fee||0,x.from)}</small></div><span class="amount">${money(x.sent,x.from)} → ${money(x.received,x.to)}</span><div class="row-actions"><button data-edit="transfer" data-id="${x.id}"><i class="bi bi-pencil-square" aria-hidden="true"></i></button><button data-delete="transfer" data-id="${x.id}"><i class="bi bi-trash3" aria-hidden="true"></i></button></div></div>`).join("")}</div>`:empty("Sin transferencias","Registra manualmente los valores enviados y recibidos.")}</div>`;
+  const rateOf=x=>{const base=(Number(x.sent)||0)+(Number(x.fee)||0);return base>0&&Number(x.received)>0?Number(x.received)/base:null};
+  const outgoing=items.filter(x=>x.from===state.country&&rateOf(x)).slice(0,8).reverse();
+  let chart="";
+  if(outgoing.length>=2){
+    const rates=outgoing.map(rateOf),avg=rates.reduce((a,b)=>a+b,0)/rates.length,min=Math.min(...rates),max=Math.max(...rates),pad=(max-min||max*.01)*.25,lo=min-pad,hi=max+pad;
+    const X=i=>outgoing.length===1?50:i/(outgoing.length-1)*100,Y=v=>(1-(v-lo)/(hi-lo))*100,best=rates.indexOf(max),to=outgoing[0].to;
+    const path=rates.map((r,i)=>`${i?"L":"M"}${X(i).toFixed(3)} ${Y(r).toFixed(3)}`).join(" ");
+    chart=`<article class="dz-panel tr-chart"><div class="dz-head"><div><h3>${meta[to].symbol} recibidos por cada ${meta[state.country].symbol} enviado</h3><p>Incluye la comisión · últimos ${outgoing.length} envíos</p></div><div class="dz-net"><span>Tu promedio</span><strong class="num">${formatRate(avg,state.country,to)}</strong></div></div>
+      <div class="dz-line-wrap"><div class="dz-yaxis"><span>${formatRate(hi,state.country,to).split(" ")[0]}</span><span>${formatRate((hi+lo)/2,state.country,to).split(" ")[0]}</span><span>${formatRate(lo,state.country,to).split(" ")[0]}</span></div>
+      <div class="dz-line is-short"><div class="dz-grid"><i></i><i></i><i></i></div><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="100" y1="${Y(avg).toFixed(3)}" y2="${Y(avg).toFixed(3)}" class="tr-avg" vector-effect="non-scaling-stroke"/><path d="${path}" class="tr-path" fill="none" vector-effect="non-scaling-stroke"/></svg>
+      ${outgoing.map((x,i)=>`<button type="button" class="dz-marker ${i===best?"is-best":"is-snd"}" style="left:${X(i)}%;top:${Y(rates[i])}%" ${tip(dateLabel(x.date),`${money(x.sent,x.from)} → ${money(x.received,x.to)} · ${formatRate(rates[i],x.from,x.to)}`)} aria-label="${escapeAttr(`${dateLabel(x.date)}: ${formatRate(rates[i],x.from,x.to)}`)}"></button>`).join("")}</div>
+      <div class="dz-xaxis">${outgoing.map((x,i)=>`<span style="left:${X(i)}%">${new Intl.DateTimeFormat("es",{month:"short",timeZone:"UTC"}).format(new Date(`${x.date}T12:00:00Z`)).replace(".","")}</span>`).join("")}</div></div>
+      <p class="dz-foot">El punto verde fue tu mejor envío: ${formatRate(max,state.country,to)} el ${dateLabel(outgoing[best].date)}.</p></article>`;
+  }
+  return `${pageHead("Transferencias",`Lo que mandaste y lo que realmente llegó. No cuentan como ingreso ni gasto.`,`<button class="button" data-add="transfer"><i class="bi bi-plus-lg" aria-hidden="true"></i>Nueva transferencia</button>`)}
+  ${chart}
+  <div class="panel table-panel">${items.length?`<div class="tr-table"><div class="tr-row tr-headrow"><span>Fecha</span><span>Enviado</span><span>Recibido</span><span>Comisión</span><span>Tasa</span><span></span></div>${items.map(x=>{const r=rateOf(x);return `<div class="tr-row"><span class="tr-date"><i class="bi bi-arrow-left-right" aria-hidden="true"></i>${dateLabel(x.date)}<small>${meta[x.from].name} → ${meta[x.to].name}</small></span><span class="num" data-label="Enviado">${money(x.sent,x.from)}</span><span class="num" data-label="Recibido">${money(x.received,x.to)}</span><span class="num muted" data-label="Comisión">${money(x.fee||0,x.from)}</span><span class="num" data-label="Tasa">${r?formatRate(r,x.from,x.to):"—"}</span><div class="row-actions"><button data-edit="transfer" data-id="${x.id}" aria-label="Editar transferencia"><i class="bi bi-pencil-square" aria-hidden="true"></i></button><button data-delete="transfer" data-id="${x.id}" aria-label="Eliminar transferencia"><i class="bi bi-trash3" aria-hidden="true"></i></button></div></div>`}).join("")}</div>`:empty("Sin transferencias","Registra los valores enviados y recibidos.")}</div>`;
 }
 function loanPaymentHistory(loan){
   const saved=Array.isArray(loan.payments)?loan.payments.map(x=>({...x,amount:Number(x.amount)||0})):[],savedTransactionIds=new Set(saved.map(x=>x.transactionId).filter(Boolean));
@@ -731,7 +759,7 @@ function renderRecurrings(){
   const recurringTotals=`<div class="recurring-total-cards" aria-label="Resumen de pagos recurrentes"><div><span>Total recurrentes</span><strong>${money(totalRecurring)}</strong></div><div class="pending"><span>Pendientes</span><strong>${money(totalPending)}</strong></div></div>`;
   const actions=`<div class="page-head-actions recurring-page-actions">${recurringTotals}<div class="recurring-action-buttons"><button class="button ghost" type="button" data-clear-recurring-checks ${checkedCount?"":"disabled"}>Reiniciar manualmente</button><button class="button" data-add="recurring"><i class="bi bi-plus-lg" aria-hidden="true"></i>Nuevo recurrente</button></div></div>`;
   return `${pageHead("Pagos recurrentes",`Recordatorios de gastos e ingresos periódicos.`,actions)}
-  <div class="panel table-panel">${items.length?`<div class="recurring-check-summary"><span><strong>${checkedCount}</strong> de ${items.length} pagados</span><small>Estado manual: el día de referencia nunca cambia los checks.</small></div><div class="transaction-list recurring-list">${items.map(x=>{const checked=isRecurringChecked(x.id);return `<div class="transaction-row recurring-row ${checked?"is-paid":""}" data-recurring-row="${x.id}"><label class="recurring-check" title="${checked?"Marcar como pendiente":"Marcar como pagado"}"><input type="checkbox" data-recurring-check="${x.id}" ${checked?"checked":""} aria-label="${checked?"Marcar como pendiente":"Marcar como pagado"}: ${escapeAttr(x.description)}"><span aria-hidden="true"><i class="bi bi-check-lg"></i></span></label><div class="tx-icon"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></div><div><strong>${escapeHtml(x.description)}</strong><small>${escapeHtml(x.frequency)} · Día de referencia: ${x.day}</small></div><span class="amount ${x.type}">${money(x.amount)}</span><div class="row-actions"><button data-edit="recurring" data-id="${x.id}"><i class="bi bi-pencil-square" aria-hidden="true"></i></button><button data-delete="recurring" data-id="${x.id}"><i class="bi bi-trash3" aria-hidden="true"></i></button></div></div>`}).join("")}</div>`:empty("Sin pagos recurrentes","Agrega recordatorios; no crean transacciones automáticamente.")}</div>`;
+  <div class="panel table-panel">${items.length?`<div class="recurring-check-summary"><span><strong>${checkedCount}</strong> de ${items.length} pagados</span><span class="rc-progress" aria-hidden="true"><i style="width:${items.length?checkedCount/items.length*100:0}%"></i></span><small>Estado manual: el día de referencia nunca cambia los checks.</small></div><div class="transaction-list recurring-list">${items.map(x=>{const checked=isRecurringChecked(x.id);return `<div class="transaction-row recurring-row ${checked?"is-paid":""}" data-recurring-row="${x.id}"><label class="recurring-check" title="${checked?"Marcar como pendiente":"Marcar como pagado"}"><input type="checkbox" data-recurring-check="${x.id}" ${checked?"checked":""} aria-label="${checked?"Marcar como pendiente":"Marcar como pagado"}: ${escapeAttr(x.description)}"><span aria-hidden="true"><i class="bi bi-check-lg"></i></span></label><div class="tx-icon"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></div><div><strong>${escapeHtml(x.description)}</strong><small>${escapeHtml(x.frequency)} · Día ${x.day}${(()=>{const d=Number(x.day)-new Date().getDate();return !checked&&x.frequency==="Mensual"&&d>=0&&d<=5?` <b class="rc-soon">${d===0?"Vence hoy":`Vence en ${d} ${d===1?"día":"días"}`}</b>`:""})()}</small></div><span class="amount ${x.type}">${money(x.amount)}</span><div class="row-actions"><button data-edit="recurring" data-id="${x.id}"><i class="bi bi-pencil-square" aria-hidden="true"></i></button><button data-delete="recurring" data-id="${x.id}"><i class="bi bi-trash3" aria-hidden="true"></i></button></div></div>`}).join("")}</div>`:empty("Sin pagos recurrentes","Agrega recordatorios; no crean transacciones automáticamente.")}</div>`;
 }
 function renderSettings(){const cloud=window.MiDineroCloud,connected=cloud?.isConnected(),status=window.miDineroCloudStatus?.text||"Falta configurar Google OAuth";const categories=availableCategories();return `${pageHead("Configuración","Administra categorías, apariencia, sincronización y copias de seguridad.")}
   <div class="panel category-manager-panel">
@@ -750,9 +778,24 @@ function renderSettings(){const cloud=window.MiDineroCloud,connected=cloud?.isCo
   </div>
   <div class="settings-grid"><div class="panel appearance-panel"><h3>Apariencia</h3><p class="muted">Elige cómo quieres ver la aplicación en este dispositivo.</p><div class="theme-selector" role="group" aria-label="Modo de apariencia"><button type="button" data-theme-option="light" class="${colorTheme==="light"?"active":""}" aria-pressed="${colorTheme==="light"}"><span aria-hidden="true"><i class="bi bi-sun"></i></span><strong>Modo día</strong><small>Fondo claro</small></button><button type="button" data-theme-option="dark" class="${colorTheme==="dark"?"active":""}" aria-pressed="${colorTheme==="dark"}"><span aria-hidden="true"><i class="bi bi-moon-stars"></i></span><strong>Modo noche</strong><small>Fondo oscuro</small></button></div></div><div class="panel"><h3>Cuenta</h3><div class="settings-row"><span>Nombre</span><strong>${escapeHtml(state.settings.user)}</strong></div><div class="settings-row"><span>Almacenamiento</span><strong>Google Sheets obligatorio</strong></div><div class="cloud-status" id="cloudStatus">${escapeHtml(status)}</div><div class="form-actions" style="justify-content:flex-start">${connected?`<button class="button" id="syncNow">Sincronizar ahora</button><button class="button ghost" id="disconnectGoogle">Desconectar</button>`:`<button class="button" id="connectGoogle">Conectar Google Sheets</button>`}</div></div>
   <div class="panel private-config-panel"><div class="private-config-head"><div><span class="private-config-kicker">Acceso y sincronización</span><h3>Configuración privada</h3></div><span class="private-config-badge" aria-label="Valores ocultos por defecto">Protegida</span></div><p class="muted private-config-intro">Los identificadores se ocultan para evitar que otras personas los vean en tu pantalla. Los permisos de Google Sheets continúan siendo la protección real de tus datos.</p><div class="private-config-fields"><div class="field"><label for="googleClientId">Google OAuth Client ID</label><div class="secret-input-wrap"><input class="input secret-input" type="password" id="googleClientId" value="${escapeAttr(window.MI_DINERO_CLOUD_CONFIG?.clientId||"")}" placeholder="...apps.googleusercontent.com" autocomplete="off" spellcheck="false"><button type="button" class="secret-toggle" data-secret-toggle="googleClientId" aria-label="Mostrar Google OAuth Client ID" aria-pressed="false"><span class="secret-toggle-icon" aria-hidden="true"><i class="bi bi-eye"></i></span><span class="secret-toggle-label">Mostrar</span></button></div><small class="field-help">Identifica la aplicación ante Google; no es una contraseña.</small></div><div class="field"><label for="googleSheetId">ID del Google Sheet</label><div class="secret-input-wrap"><input class="input secret-input" type="password" id="googleSheetId" value="${escapeAttr(window.MI_DINERO_CLOUD_CONFIG?.spreadsheetId||"")}" placeholder="Identificador del archivo maestro" autocomplete="off" spellcheck="false"><button type="button" class="secret-toggle" data-secret-toggle="googleSheetId" aria-label="Mostrar ID del Google Sheet" aria-pressed="false"><span class="secret-toggle-icon" aria-hidden="true"><i class="bi bi-eye"></i></span><span class="secret-toggle-label">Mostrar</span></button></div><small class="field-help">Solo las cuentas autorizadas en Google pueden acceder al archivo.</small></div></div><div class="private-config-footer"><span class="private-config-note"><span aria-hidden="true">●</span> Se guardan en este navegador al pulsar el botón.</span><button class="button" id="saveCloudConfig">Guardar configuración</button></div></div>
+  ${merchantMigrationPanel()}
   <div class="panel"><h3>Respaldos</h3><p class="muted">Descarga un respaldo completo o importa uno anterior.</p><div class="form-actions" style="justify-content:flex-start"><button class="button" id="exportData">Exportar respaldo</button><label class="button ghost" for="importData">Importar respaldo</label><input class="file-input" type="file" id="importData" accept=".json"></div><div class="settings-row"><span>Reiniciar aplicación</span><button class="button danger" id="resetData">Borrar todos los datos</button></div></div></div>`}
 
+function merchantMigrationPanel(){
+  const mm=state.merchantMigration,count=mm?.changes?.length||0;
+  const copy=mm?.undone?"Se deshizo la separación automática; las descripciones volvieron a su texto original.":count?`Separamos automáticamente ${count} ${count===1?"descripción antigua":"descripciones antiguas"} en comercio + detalle (por ejemplo, “Taobao · audífonos” → Taobao + audífonos). El texto original quedó guardado.`:"No hubo descripciones antiguas que separar en comercio y detalle.";
+  return `<div class="panel"><h3>Comercio y detalle</h3><p class="muted">${copy}</p>${count?`<div class="form-actions" style="justify-content:flex-start"><button type="button" class="button ghost" id="reviewMerchantMigration">Revisar ${count}</button><button type="button" class="button ghost" id="undoMerchantMigration">Deshacer</button></div>`:""}</div>`;
+}
+function openMerchantMigrationReview(){
+  const changes=state.merchantMigration?.changes||[],byId=new Map(state.transactions.map(x=>[x.id,x]));
+  $("#modalEyebrow").textContent="CONFIGURACIÓN";$("#modalTitle").textContent="Comercio y detalle separados";
+  $("#recordForm").innerHTML=`<div class="mm-list">${changes.map(c=>{const x=byId.get(c.id);if(!x)return "";return `<div class="mm-row"><span class="muted">${escapeHtml(c.original)}</span><i class="bi bi-arrow-right" aria-hidden="true"></i><span><strong>${escapeHtml(x.description)}</strong>${x.detail?` · ${escapeHtml(x.detail)}`:""}<small>${meta[x.country].name} · ${dateLabel(x.date)}</small></span></div>`}).join("")}</div><div class="form-actions"><button type="button" class="button" data-close>Cerrar</button></div>`;
+  $("#recordForm").dataset.kind="info";$("#modal").classList.remove("hidden");$$("[data-close]",$("#modal")).forEach(x=>x.onclick=closeForm);
+}
 function bindPage(){
+  bindChartTips($("#content"));
+  if($("#reviewMerchantMigration"))$("#reviewMerchantMigration").onclick=openMerchantMigrationReview;
+  if($("#undoMerchantMigration"))$("#undoMerchantMigration").onclick=async()=>{if(!window.confirm("¿Volver a dejar las descripciones como estaban antes de separarlas?"))return;const previousState=structuredClone(state);const n=undoMerchantMigration(state);if(await saveState(previousState)){render();toast(`${n} descripciones restauradas`)}};
   $$("[data-add]").forEach(b=>b.onclick=()=>openForm(b.dataset.add));
   $$("[data-edit]").forEach(b=>b.onclick=()=>openForm(b.dataset.edit,b.dataset.id));
   $$("[data-delete]").forEach(b=>b.onclick=()=>askDelete(b.dataset.delete,b.dataset.id));
@@ -877,6 +920,21 @@ function filterTransactions(){
   });
   const count=$("#transactionCount");
   if(count)count.textContent=String(visible);
+  $$(".tx-day",$("#txList")).forEach(head=>{
+    const any=$$(`.transaction-row[data-date="${CSS.escape(head.dataset.day)}"]`,$("#txList")).some(row=>row.style.display!=="none");
+    head.style.display=any?"":"none";
+  });
+  const list=$("#txList");
+  if(list&&list.querySelector(".transaction-row")){
+    let none=$("#txNoResults",list);
+    if(!none){list.insertAdjacentHTML("beforeend",`<div id="txNoResults" class="empty hidden"><div><strong>Sin resultados</strong>Ningún movimiento coincide con estos filtros.</div></div>`);none=$("#txNoResults",list)}
+    none.classList.toggle("hidden",visible>0);
+  }
+  const totalsBox=$("#txTotals");
+  if(totalsBox){
+    const ids=new Set($$(".transaction-row[data-transaction-id]",$("#txList")).filter(row=>row.style.display!=="none").map(row=>row.dataset.transactionId));
+    totalsBox.innerHTML=transactionTotalsHtml(state.transactions.filter(x=>ids.has(String(x.id))));
+  }
 }
 function exportVisibleTransactions(){
   const visibleIds=$$(".transaction-row[data-transaction-id]",$("#txList")).filter(row=>row.style.display!=="none").map(row=>row.dataset.transactionId);
@@ -917,21 +975,44 @@ function bindDatePickers(root){
   });
 }
 function openForm(kind,id=null){
-  const map={transaction:"Transacción",account:"Cuenta",budget:"Presupuesto",transfer:"Transferencia",loan:"Préstamo",recurring:"Pago recurrente"};
+  const map={transaction:"Movimiento",account:"Cuenta",budget:"Presupuesto",transfer:"Transferencia",loan:"Préstamo",recurring:"Pago recurrente"};
   const collection={transaction:"transactions",account:"accounts",budget:"budgets",transfer:"transfers",loan:"loans",recurring:"recurrings"}[kind];
   const item=id?state[collection].find(x=>x.id===id):null;
-  $("#modalEyebrow").textContent=id?"EDITAR":"NUEVO";$("#modalTitle").textContent=map[kind];
+  const country=item?.country||state.country,cur=meta[country].currency;
+  $("#modalEyebrow").textContent=id?"EDITAR":"NUEVO";
+  $("#modalTitle").textContent=kind==="transaction"?`${id?"Editar movimiento":"Nuevo movimiento"} · ${meta[country].name}`:map[kind];
   const typeOpts=[{value:"gasto",label:"Gasto"},{value:"ingreso",label:"Ingreso"},{value:"cobro",label:"Cobro / reembolso"},{value:"ajuste",label:"Ajuste"}];
   const categoryNames=availableCategories(),catOpts=categoryNames.map(x=>({value:x,label:x}));
+  const countryOpts=[{value:"CN",label:"China (CNY ¥)"},{value:"CO",label:"Colombia (COP $)"}];
   let html="";
-  if(kind==="transaction")html=formField("Descripción","description","text",item?.description||"",null,true)+formField("Tipo","type","text",item?.type||"gasto",typeOpts)+formField(`Monto (${meta[state.country].currency})`,"amount","number",item?.amount||"")+formField("Categoría","category","text",item?.category||categoryNames[0],catOpts)+formField("Fecha","date","date",item?.date||today());
-  if(kind==="account")html=`<div class="field full"><label>Nombre de la cuenta</label><input class="input" name="name" type="text" maxlength="80" value="${escapeAttr(item?.name||"")}" placeholder="Ej. ICBC, Nequi o Efectivo" autocomplete="off" required></div><div class="field full"><label>Saldo actual (${meta[state.country].currency})</label><input class="input" name="balance" type="number" step="0.01" inputmode="decimal" value="${escapeAttr(item?.balance??"")}" required><small class="field-help">Al guardar, este valor reemplaza el saldo anterior.</small></div>`;
-  if(kind==="budget")html=formField("Categoría","category","text",item?.category||categoryNames[0],catOpts)+formField(`Límite (${meta[state.country].currency})`,"amount","number",item?.amount||"");
-  if(kind==="transfer")html=formField("Desde","from","text",item?.from||state.country,[{value:"CN",label:"China (RMB)"},{value:"CO",label:"Colombia (COP)"}])+formField("Hacia","to","text",item?.to||(state.country==="CN"?"CO":"CN"),[{value:"CO",label:"Colombia (COP)"},{value:"CN",label:"China (RMB)"}])+formField("Monto enviado","sent","number",item?.sent||"")+formField("Monto recibido","received","number",item?.received||"")+formField("Comisión opcional","fee","number",item?.fee||0)+formField("Fecha","date","date",item?.date||today());
-  if(kind==="loan")html=formField("Tipo","direction","text",item?.direction||"owed",[{value:"owed",label:"Dinero que debemos"},{value:"receivable",label:"Dinero que nos deben"}])+formField("Persona o entidad","person","text",item?.person||"")+formField("Descripción / motivo (opcional)","note","text",item?.note||"")+formField("Monto original","amount","number",item?.amount||"")+formField("Saldo pendiente","balance","number",item?.balance??item?.amount??"")+formField("Fecha","date","date",item?.date||today())+(!id?`<label class="form-check full"><input type="checkbox" name="affectBalance" value="yes"><span aria-hidden="true"><i class="bi bi-check-lg"></i></span><div><strong>Crear también una transacción</strong><small>Actívalo solo si el dinero entra o sale de tu saldo ahora. Déjalo apagado si solo documentas una deuda anterior.</small></div></label>`:"");
-  if(kind==="recurring")html=formField("Descripción","description","text",item?.description||"",null,true)+formField("Tipo","type","text",item?.type||"gasto",typeOpts.slice(0,2))+formField("Monto","amount","number",item?.amount||"")+formField("Frecuencia","frequency","text",item?.frequency||"Mensual",[{value:"Mensual",label:"Mensual"},{value:"Semanal",label:"Semanal"},{value:"Anual",label:"Anual"}])+formField("Día de cobro","day","number",item?.day||1);
-  $("#recordForm").innerHTML=`<div class="form-grid">${html}</div><div class="form-actions"><button type="button" class="button ghost" data-close>Cancelar</button><button class="button" type="submit">Guardar</button></div>`;
-  $("#recordForm").dataset.kind=kind;$("#recordForm").dataset.id=id||"";$("#modal").classList.remove("hidden");bindDatePickers($("#recordForm"));$$("[data-close]",$("#modal")).forEach(x=>x.onclick=closeForm);
+  if(kind==="transaction")html=transactionFormHtml(item);
+  if(kind==="account")html=`<div class="field full"><label for="accountName">Nombre de la cuenta</label><input class="input" id="accountName" name="name" type="text" maxlength="80" value="${escapeAttr(item?.name||"")}" placeholder="Ej. ICBC, Nequi o Efectivo" autocomplete="off" required></div>${moneyField(`Saldo actual (${cur})`,"balance",item?.balance??"",country,{full:true,allowNegative:true,help:"Reemplaza el saldo anterior"})}`;
+  if(kind==="budget")html=formField("Categoría","category","text",item?.category||categoryNames[0],catOpts)+moneyField(`Límite mensual (${cur})`,"amount",item?.amount??"",country);
+  if(kind==="transfer"){
+    const from=item?.from||state.country,to=item?.to||(from==="CN"?"CO":"CN");
+    html=formField("Desde","from","text",from,countryOpts)+formField("Hacia","to","text",to,countryOpts.slice().reverse())
+      +moneyField("Enviaste","sent",item?.sent??"",from)+moneyField("Comisión (opcional)","fee",item?.fee??0,from,{required:false})
+      +moneyField("Llegó","received",item?.received??"",to)+formField("Fecha de envío","date","date",item?.date||today())
+      +`<div class="field"><label for="arrivalDate">Fecha de llegada <span class="tx-optional">· opcional</span></label><input class="input" id="arrivalDate" name="arrivalDate" type="date" value="${escapeAttr(item?.arrivalDate||"")}"></div>`
+      +`<div class="field full tr-rate" data-transfer-rate><span>Recibiste por cada unidad enviada</span><strong>—</strong><small></small></div>`;
+  }
+  if(kind==="loan"){
+    const people=topLoanPeople(country),direction=item?.direction||"owed";
+    html=`<div class="field full"><span class="tx-label">¿Quién le debe a quién?</span><div class="loan-dirs">${[["owed","Nosotros debemos","Nos prestaron dinero"],["receivable","Nos deben","Nosotros prestamos"]].map(([v,l,h])=>`<label class="loan-dir"><input type="radio" name="direction" value="${v}" ${direction===v?"checked":""}><span><strong>${l}</strong><small>${h}</small></span></label>`).join("")}</div></div>
+      <div class="field full"><label for="loanPerson">Persona o entidad</label><input class="input" id="loanPerson" name="person" maxlength="80" value="${escapeAttr(item?.person||"")}" placeholder="Ej. banco, compañero, familiar" autocomplete="off" required>${people.length?`<div class="tx-quick">${people.map(p=>`<button type="button" class="tx-pill" data-person-pick="${escapeAttr(p)}">${escapeHtml(p)}</button>`).join("")}</div>`:""}</div>
+      <div class="field full"><label for="loanNote">Motivo <span class="tx-optional">· opcional</span></label><input class="input" id="loanNote" name="note" maxlength="120" value="${escapeAttr(item?.note||"")}" placeholder="Ej. compra del carro" autocomplete="off"></div>
+      ${moneyField(`Monto prestado (${cur})`,"amount",item?.amount??"",country)}${formField("Fecha","date","date",item?.date||today())}
+      ${id?moneyField(`Saldo pendiente (${cur})`,"balance",item?.balance??item?.amount??"",country,{full:true}):`<label class="form-check full"><input type="checkbox" name="hasPrior" value="yes"><span aria-hidden="true"><i class="bi bi-check-lg"></i></span><div><strong>Ya tiene abonos anteriores</strong><small>Actívalo si registras una deuda vieja y quieres poner lo que falta hoy.</small></div></label><div class="full hidden" data-loan-prior>${moneyField(`Saldo pendiente hoy (${cur})`,"balance","",country,{required:false,full:true})}</div>
+      <label class="form-check full"><input type="checkbox" name="affectBalance" value="yes"><span aria-hidden="true"><i class="bi bi-check-lg"></i></span><div><strong>Crear también el movimiento de dinero</strong><small data-loan-affect-help></small></div></label>`}`;
+  }
+  if(kind==="recurring")html=formField("Descripción","description","text",item?.description||"",null,true)+formField("Tipo","type","text",item?.type||"gasto",typeOpts.slice(0,2))+moneyField(`Monto (${cur})`,"amount",item?.amount??"",country)+formField("Frecuencia","frequency","text",item?.frequency||"Mensual",[{value:"Mensual",label:"Mensual"},{value:"Semanal",label:"Semanal"},{value:"Anual",label:"Anual"}])+formField("Día de cobro","day","number",item?.day||1);
+  const form=$("#recordForm");
+  form.innerHTML=`<div class="form-grid">${html}</div><div class="form-actions"><button type="button" class="button ghost" data-close>Cancelar</button><button class="button" type="submit">Guardar</button></div>`;
+  form.dataset.kind=kind;form.dataset.id=id||"";$("#modal").classList.remove("hidden");bindDatePickers(form);$$("[data-close]",$("#modal")).forEach(x=>x.onclick=closeForm);
+  bindMoneyInputs(form);
+  if(kind==="transaction")bindTransactionForm(form);
+  if(kind==="transfer")bindTransferForm(form,id||"");
+  if(kind==="loan")bindLoanForm(form);
 }
 function closeForm(){$("#modal").classList.add("hidden")}
 function createLoanCashTransaction({loan,amount,date,stage}){
@@ -964,6 +1045,14 @@ $("#recordForm").onsubmit=async e=>{
   e.preventDefault();
   const form=e.currentTarget,submitButton=form.querySelector('[type="submit"]'),previousState=structuredClone(state);
   const kind=e.currentTarget.dataset.kind,id=e.currentTarget.dataset.id,data=Object.fromEntries(new FormData(e.currentTarget));
+  if(kind==="info"){closeForm();return}
+  delete data.__country;
+  if(kind==="transaction"){
+    data.description=String(data.description||"").trim().replace(/\s+/g," ");data.detail=String(data.detail||"").trim().replace(/\s+/g," ");
+    if(!data.description){toast("Escribe el comercio o persona");return}
+    if(!data.category){toast("Elige una categoría");return}
+    if(!availableCategories().some(x=>x===data.category)){categoryRegistry().push(data.category);categoryRegistry().sort((a,b)=>a.localeCompare(b,"es"))}
+  }
   if(kind==="loanPayment"){
     const loan=state.loans.find(x=>x.id===id),value=Number(data.amount);
     if(!loan||!value||value<=0||value>Number(loan.balance)){toast("Ingresa un abono válido, sin superar el saldo pendiente");return}
@@ -1005,7 +1094,9 @@ $("#recordForm").onsubmit=async e=>{
   }
   if(kind==="transfer"&&data.from===data.to){toast("El origen y el destino deben ser distintos");return}
   const affectBalance=data.affectBalance==="yes";delete data.affectBalance;
-  if(kind==="loan"&&!id)data.balance=data.amount;
+  const hasPrior=data.hasPrior==="yes";delete data.hasPrior;
+  if(kind==="loan"&&!id&&!hasPrior)data.balance=data.amount;
+  if(kind==="loan"&&(!(data.balance>=0)||data.balance>data.amount)){toast("El saldo pendiente no puede ser mayor al monto prestado");return}
   const record={...data,id:id||uid(kind[0]),country:kind==="transfer"?undefined:state.country,updatedAt:new Date().toISOString()};
   if(id)state[collection]=state[collection].map(x=>x.id===id?{...x,...record}:x);
   else{state[collection].push(record);if(kind==="loan"&&affectBalance)createLoanCashTransaction({loan:record,amount:record.amount,date:record.date,stage:"opening"});}
@@ -1050,16 +1141,21 @@ function openLoanPaymentEditor(loanId,paymentId){
   loanDetailReturnContext=loanDetailContext?{...loanDetailContext}:null;hideLoanDetail({preserveContext:true});
   $("#modalEyebrow").textContent="PRÉSTAMO";$("#modalTitle").textContent=payment.untracked?"Editar abonos anteriores":"Editar abono";
   const optionalDate=`<div class="field"><label>Fecha (opcional)</label><input class="input" name="date" type="date" value="${escapeAttr(payment.date||"")}" title="Haz clic para elegir una fecha"></div>`;
-  $("#recordForm").innerHTML=`<div class="loan-payment-summary"><span>${loan.direction==="owed"?"Le debemos a":"Nos debe"} ${escapeHtml(loan.person)}</span><strong>Saldo actual: ${money(loan.balance,loan.country)}</strong></div><div class="form-grid">${formField(`Monto del abono (${meta[loan.country].currency})`,"amount","number",payment.amount)}${optionalDate}<label class="form-check full"><input type="checkbox" name="affectBalance" value="yes" ${payment.affectBalance?"checked":""}><span aria-hidden="true"><i class="bi bi-check-lg"></i></span><div><strong>Reflejar también en Transacciones</strong><small>${loan.direction==="owed"?"Mantiene una salida vinculada al pago de la deuda.":"Mantiene una entrada vinculada al cobro de la deuda."}</small></div></label></div><div class="form-actions"><button type="button" class="button ghost" data-close-loan-payment>Cancelar</button><button class="button" type="submit">Guardar cambios</button></div>`;
-  $("#recordForm").dataset.kind="loanPaymentEdit";$("#recordForm").dataset.id=loanId;$("#recordForm").dataset.paymentId=paymentId;$("#modal").classList.remove("hidden");bindDatePickers($("#recordForm"));
+  $("#recordForm").innerHTML=`<div class="loan-payment-summary"><span>${loan.direction==="owed"?"Le debemos a":"Nos debe"} ${escapeHtml(loan.person)}</span><strong>Saldo actual: ${money(loan.balance,loan.country)}</strong></div><div class="form-grid">${moneyField(`Monto del abono (${meta[loan.country].currency})`,"amount",payment.amount,loan.country)}${optionalDate}<label class="form-check full"><input type="checkbox" name="affectBalance" value="yes" ${payment.affectBalance?"checked":""}><span aria-hidden="true"><i class="bi bi-check-lg"></i></span><div><strong>Reflejar también en Transacciones</strong><small>${loan.direction==="owed"?"Mantiene una salida vinculada al pago de la deuda.":"Mantiene una entrada vinculada al cobro de la deuda."}</small></div></label></div><div class="form-actions"><button type="button" class="button ghost" data-close-loan-payment>Cancelar</button><button class="button" type="submit">Guardar cambios</button></div>`;
+  $("#recordForm").dataset.kind="loanPaymentEdit";$("#recordForm").dataset.id=loanId;$("#recordForm").dataset.paymentId=paymentId;$("#modal").classList.remove("hidden");bindDatePickers($("#recordForm"));bindMoneyInputs($("#recordForm"));
   const cancel=()=>{$("#modal").classList.add("hidden");restoreLoanDetail()};
   $("[data-close]",$("#modal")).onclick=cancel;$("[data-close-loan-payment]",$("#modal")).onclick=cancel;
 }
 function payLoan(id){
   const loan=state.loans.find(x=>x.id===id);if(!loan)return;
+  const pending=Number(loan.balance)||0,last=loanPaymentHistory(loan).find(x=>!x.untracked&&Number(x.amount)>0);
+  const chips=[last&&Number(last.amount)<pending?[`Como el último · ${money(last.amount,loan.country)}`,last.amount]:null,[`Todo · ${money(pending,loan.country)}`,pending]].filter(Boolean);
   $("#modalEyebrow").textContent="PRÉSTAMO";$("#modalTitle").textContent="Registrar abono";
-  $("#recordForm").innerHTML=`<div class="loan-payment-summary"><span>${loan.direction==="owed"?"Le debemos a":"Nos debe"} ${escapeHtml(loan.person)}</span><strong>Saldo pendiente: ${money(loan.balance,loan.country)}</strong></div><div class="form-grid">${formField(`Monto del abono (${meta[loan.country].currency})`,"amount","number","")}${formField("Fecha","date","date",today())}<label class="form-check full"><input type="checkbox" name="affectBalance" value="yes"><span aria-hidden="true"><i class="bi bi-check-lg"></i></span><div><strong>Crear también una transacción</strong><small>${loan.direction==="owed"?"Registra una salida porque estás devolviendo dinero.":"Registra una entrada porque estás recibiendo el abono."}</small></div></label></div><div class="form-actions"><button type="button" class="button ghost" data-close>Cancelar</button><button class="button" type="submit">Registrar abono</button></div>`;
+  $("#recordForm").innerHTML=`<div class="loan-payment-summary"><span>${loan.direction==="owed"?"Le debemos a":"Nos debe"} ${escapeHtml(loan.person)}</span><strong>Saldo pendiente: ${money(pending,loan.country)}</strong></div><div class="form-grid">${moneyField(`Monto del abono (${meta[loan.country].currency})`,"amount","",loan.country,{full:true,extra:`max="${pending}"`})}<div class="field full tx-quick">${chips.map(([l,v])=>`<button type="button" class="tx-pill" data-pay-pick="${v}">${escapeHtml(l)}</button>`).join("")}</div>
+  <div class="pay-preview full" data-payment-preview><div class="pay-preview-row"><span>Saldo pendiente</span><span class="num"><s>${money(pending,loan.country)}</s> → <b data-after></b></span></div><div class="pay-bar" aria-hidden="true"><i data-bar-paid></i><i data-bar-now></i></div><small data-msg></small></div>
+  ${formField("Fecha","date","date",today())}<label class="form-check full"><input type="checkbox" name="affectBalance" value="yes" checked><span aria-hidden="true"><i class="bi bi-check-lg"></i></span><div><strong>Crear también el movimiento de dinero</strong><small>${loan.direction==="owed"?"Registra una salida (abono a capital). No cuenta como gasto del mes.":"Registra una entrada porque te devolvieron dinero. No cuenta como ingreso del mes."}</small></div></label></div><div class="form-actions"><button type="button" class="button ghost" data-close>Cancelar</button><button class="button" type="submit">Registrar abono</button></div>`;
   $("#recordForm").dataset.kind="loanPayment";$("#recordForm").dataset.id=id;$("#recordForm").dataset.paymentId="";$("#modal").classList.remove("hidden");bindDatePickers($("#recordForm"));$$("[data-close]",$("#modal")).forEach(x=>x.onclick=closeForm);
+  bindMoneyInputs($("#recordForm"));bindLoanPaymentForm($("#recordForm"),loan);
 }
 function exportData(){const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`mi-dinero-respaldo-${today()}.json`;a.click();URL.revokeObjectURL(a.href);toast("Respaldo exportado")}
 function saveCloudConfig(){const clientId=$("#googleClientId").value.trim(),spreadsheetId=$("#googleSheetId").value.trim();if(!clientId.endsWith(".apps.googleusercontent.com")||!spreadsheetId){toast("Revisa el Client ID y el Sheet ID");return}localStorage.setItem("mi-dinero-cloud-config",JSON.stringify({clientId,spreadsheetId,sheetName:"_AppState"}));toast("Configuración guardada; recargando…");setTimeout(()=>location.reload(),700)}
@@ -1140,10 +1236,11 @@ window.addEventListener("resize",()=>{
 });
 $("#refreshButton").onclick=()=>{const cloud=window.MiDineroCloud;if(!cloud?.isConnected()){toast("Conecta Google Sheets para actualizar los datos");cloud?.showLogin?.();return}cloud.pull()};
 window.miDineroGetState=()=>structuredClone(state);
-window.miDineroApplyState=(next,{silent=false}={})=>{state={...blankState(),...restoreLegacyRecurringChecks(next)};localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();if(!silent)toast("Datos sincronizados desde Google Sheets")};
-window.miDineroGetPendingRecurringChecksMigration=()=>pendingLegacyRecurringChecksMigration?structuredClone(state):null;
+let pendingMerchantMigration=false;
+window.miDineroApplyState=(next,{silent=false}={})=>{state={...blankState(),...restoreLegacyRecurringChecks(next)};if(migrateMerchantDetail(state)>0)pendingMerchantMigration=true;localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();if(!silent)toast("Datos sincronizados desde Google Sheets")};
+window.miDineroGetPendingRecurringChecksMigration=()=>pendingLegacyRecurringChecksMigration||pendingMerchantMigration?structuredClone(state):null;
 window.miDineroCompleteRecurringChecksMigration=()=>{
-  pendingLegacyRecurringChecksMigration=false;
+  pendingLegacyRecurringChecksMigration=false;pendingMerchantMigration=false;
   localStorage.setItem(RECURRING_CHECKS_MIGRATION_KEY,"complete");
   localStorage.removeItem(LEGACY_RECURRING_CHECKS_KEY);
 };
