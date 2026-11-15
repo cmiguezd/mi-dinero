@@ -356,9 +356,7 @@ function renderDashboard(){
   const merchantTx=dashboardTransactions({ignoreMerchant:true}),merchants=merchantGroups(merchantTx);
   return `${pageHead("¿En qué se está yendo tu dinero?",`${periodLabel()} en ${meta[state.country].name}.`,`<button class="button" data-add="transaction"><i class="bi bi-plus-lg" aria-hidden="true"></i>Nuevo movimiento</button>`)}
   ${dashKpis(flow,prevFlow,prev.label,balance)}
-  <div class="dz-row"><div class="dz-col">${flowCard(flow,balance)}${dailyCard()}</div>${categoryCard(groups,catTotal,expenseGroups(prevTx))}</div>
-  <div class="dz-row">${monthlyCard()}${budgetsCard()}</div>
-  ${merchantsCard(merchants,totals(merchantTx).expense)}`;
+  <div class="dz-cols"><div class="dz-col">${flowCard(flow,balance).replace('class="dz-panel"','class="dz-panel dz-o1"')}${dailyCard().replace('class="dz-panel"','class="dz-panel dz-o3"')}${monthlyCard().replace('class="dz-panel"','class="dz-panel dz-o4"')}</div><div class="dz-col">${categoryCard(groups,catTotal,expenseGroups(prevTx)).replace('class="dz-panel"','class="dz-panel dz-o2"')}${budgetsCard().replace('class="dz-panel"','class="dz-panel dz-o5"')}${merchantsCard(merchants,totals(merchantTx).expense).replace('class="dz-panel ','class="dz-panel dz-o6 ')}</div></div>`;
 }
 function metric(label,value,small,color){return `<article class="metric"><div class="metric-label"><span>${label}</span><i class="dot ${color}"></i></div><div class="metric-value">${value}</div><small>${small}</small></article>`}
 function latestDashboardBalance(country=state.country){
@@ -649,7 +647,7 @@ function transactionRows(tx,{grouped=false}={}){let lastDay="";return `<div clas
 }).join("")}</div>`}
 function spentByCategory(category){return dashboardTransactions({ignoreCategory:true}).filter(x=>x.type==="gasto"&&x.category===category).reduce((a,b)=>a+Number(b.amount),0)}
 function renderBudgets(){
-  const items=countryItems(state.budgets),pace=budgetPace(),months=dashboardMonth==="all"?12:1;
+  const allBudgets=countryItems(state.budgets),items=allBudgets.filter(x=>Number(x.amount)>0),unset=allBudgets.filter(x=>!(Number(x.amount)>0)),pace=budgetPace(),months=dashboardMonth==="all"?12:1;
   const spentAll=items.reduce((s,x)=>s+spentByCategory(x.category),0),limitAll=items.reduce((s,x)=>s+(Number(x.amount)||0)*months,0);
   const projOf=x=>{const spent=spentByCategory(x.category);return pace&&pace.ratio>0&&!budgetIsFixed(x.category)?spent/pace.ratio:spent};
   const risky=items.filter(x=>projOf(x)>(Number(x.amount)||0)*months*1.001);
@@ -661,6 +659,7 @@ function renderBudgets(){
   return `${pageHead("Presupuestos",`¿Cómo vas a terminar ${periodLabel().toLowerCase()}? · ${meta[state.country].name}`,`<button class="button" data-add="budget"><i class="bi bi-plus-lg" aria-hidden="true"></i>Nuevo presupuesto</button>`)}
   ${summary}
   <div class="budget-grid">${items.length?items.map(x=>`<article class="panel budget-card bd-card"><div class="row-actions bd-actions"><button data-edit="budget" data-id="${x.id}" aria-label="Editar presupuesto de ${escapeAttr(x.category)}"><i class="bi bi-pencil-square" aria-hidden="true"></i></button><button data-delete="budget" data-id="${x.id}" aria-label="Eliminar presupuesto de ${escapeAttr(x.category)}"><i class="bi bi-trash3" aria-hidden="true"></i></button></div>${budgetRow(x)}</article>`).join(""):empty("Sin presupuestos","Define un límite para comenzar.")}</div>
+  ${unset.length?`<details class="bd-unset"><summary>Sin límite asignado (${unset.length}) · no se muestran en el Resumen</summary><div class="bd-unset-list">${unset.map(x=>`<div class="bd-unset-row"><span>${escapeHtml(x.category)}<small>Gastado: ${money(spentByCategory(x.category))}</small></span><span class="row-actions"><button data-edit="budget" data-id="${x.id}" aria-label="Asignar límite a ${escapeAttr(x.category)}"><i class="bi bi-pencil-square" aria-hidden="true"></i></button><button data-delete="budget" data-id="${x.id}" aria-label="Eliminar presupuesto de ${escapeAttr(x.category)}"><i class="bi bi-trash3" aria-hidden="true"></i></button></span></div>`).join("")}</div></details>`:""}
   ${pace&&items.length?`<p class="bd-legend"><span><i class="is-fill"></i>Gastado</span><span><i class="is-proj"></i>Proyección al cierre</span><span><i class="is-limit"></i>Límite</span></p>`:""}`;
 }
 function renderTransfers(){

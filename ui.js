@@ -237,7 +237,7 @@ function dashKpis(flow, prevFlow, prevLabel, balance) {
     ? `<article class="dz-card"><p class="dz-eyebrow">${dot("snd")}Enviado a ${meta[other].name}</p><strong class="dz-value num">${money(flow.sent)}</strong><p class="dz-sub">${flow.sentCount} ${flow.sentCount === 1 ? "envío" : "envíos"} · incluye comisiones</p></article>`
     : `<article class="dz-card"><p class="dz-eyebrow">${dot("snd")}Recibido de ${meta[other].name}</p><strong class="dz-value num">${money(flow.received)}</strong><p class="dz-sub">${flow.receivedCount} ${flow.receivedCount === 1 ? "transferencia" : "transferencias"}</p></article>`;
   return `<section class="dz-kpis" aria-label="Indicadores del periodo">${closingCard}
-    <article class="dz-card"><p class="dz-eyebrow">${dot("inc")}Entró</p><strong class="dz-value num">${money(flow.income)}</strong><p class="dz-sub">${pctChange(flow.income, prevFlow.income) ? `${pctChange(flow.income, prevFlow.income)} vs ${prevLabel} · ` : ""}sin préstamos</p></article>
+    <article class="dz-card"><p class="dz-eyebrow">${dot("inc")}Ingresos</p><strong class="dz-value num">${money(flow.income)}</strong><p class="dz-sub">${pctChange(flow.income, prevFlow.income) ? `${pctChange(flow.income, prevFlow.income)} vs ${prevLabel} · ` : ""}sin préstamos</p></article>
     <article class="dz-card"><p class="dz-eyebrow">${dot("exp")}Gastaste</p><strong class="dz-value num">${money(flow.expense)}</strong><p class="dz-sub">${pctChange(flow.expense, prevFlow.expense) ? `${pctChange(flow.expense, prevFlow.expense)} vs ${prevLabel}` : "consumo del periodo"}</p></article>
     ${transferCard}</section>`;
 }
@@ -344,22 +344,28 @@ function categoryCard(groups, total, prevGroups) {
   </article>`;
 }
 function monthlyCard() {
-  const country = state.country;
+  const country = state.country, other = country === "CN" ? "CO" : "CN";
   const rows = Array.from({ length: 12 }, (_, i) => {
     const ym = `${dashboardYear}-${String(i + 1).padStart(2, "0")}`;
     const f = monthFlow([ym], country);
-    return { m: String(i + 1).padStart(2, "0"), label: new Date(Date.UTC(Number(dashboardYear), i, 1)).toLocaleString("es", { month: "short", timeZone: "UTC" }).replace(".", ""), inc: f.income, exp: f.expense };
+    return { m: String(i + 1).padStart(2, "0"), label: new Date(Date.UTC(Number(dashboardYear), i, 1)).toLocaleString("es", { month: "short", timeZone: "UTC" }).replace(".", ""), f };
   });
-  const max = Math.max(1, ...rows.map(r => Math.max(r.inc, r.exp)));
+  const max = Math.max(1, ...rows.map(r => Math.max(r.f.totalIn, r.f.totalOut)));
   const ticks = [max, max * 2 / 3, max / 3, 0];
+  const stack = (parts) => parts.filter(p => p[1] > 0).map(([k, v]) => `<i class="is-${k}" style="height:${(v / max * 100).toFixed(2)}%"></i>`).join("");
+  const detail = (f) => {
+    const ins = [["Ingresos", f.income], [`Recibido de ${meta[other].name}`, f.received], ["Préstamos recibidos", f.loanIn], ["Ajustes", f.adjustIn]].filter(x => x[1] > 0).map(([l, v]) => `${l} ${money(v)}`).join(", ");
+    const outs = [["Gastos", f.expense], [`Envíos a ${meta[other].name}`, f.sent], ["Abonos a préstamos", f.loanOut], ["Ajustes", f.adjustOut]].filter(x => x[1] > 0).map(([l, v]) => `${l} ${money(v)}`).join(", ");
+    return `Entró ${money(f.totalIn)}${ins ? ` (${ins})` : ""} · Salió ${money(f.totalOut)}${outs ? ` (${outs})` : ""} · Tu saldo cambió ${signedMoney(f.net)}`;
+  };
   return `<article class="dz-panel">
-    <div class="dz-head"><div><h3>Ingresos vs. gastos de consumo</h3><p>${dashboardYear} · sin envíos ni préstamos · arriba, lo que quedó después de gastar</p></div><div class="dz-legend"><span>${dot("inc")}Ingresos</span><span>${dot("exp")}Gastos</span></div></div>
+    <div class="dz-head"><div><h3>Entradas y salidas por mes</h3><p>${dashboardYear} · barra izquierda: lo que entró · derecha: lo que salió · arriba, cuánto cambió tu saldo</p></div><div class="dz-legend"><span>${dot("inc")}Ingresos</span><span>${dot("exp")}Gastos</span><span>${dot("snd")}Transferencias</span><span>${dot("loan")}Préstamos</span></div></div>
     <div class="dz-months-wrap"><div class="dz-yaxis is-bars">${ticks.map(v => `<span>${compactMoney(v)}</span>`).join("")}</div>
     <div class="dz-months">${rows.map(r => {
-      const none = !r.inc && !r.exp, net = r.inc - r.exp, sel = dashboardMonth === r.m;
-      return `<button type="button" class="dz-month ${sel ? "is-selected" : ""}" data-month-filter="${r.m}" ${tip(`${r.label} ${dashboardYear}`, none ? "Sin datos" : `Ingresos ${money(r.inc)} · Gastos ${money(r.exp)} · Quedó ${signedMoney(net)}`)} aria-label="${escapeAttr(none ? `${r.label}: sin datos` : `${r.label}: ingresos ${money(r.inc)}, gastos ${money(r.exp)}`)}">
-        <span class="dz-month-net num ${net < 0 ? "is-neg" : ""}">${none ? "" : compactMoney(net).replace(/^(?!−)/, "+")}</span>
-        <span class="dz-month-bars"><span class="is-inc" style="height:${(r.inc / max * 100).toFixed(2)}%"></span><span class="is-exp" style="height:${(r.exp / max * 100).toFixed(2)}%"></span></span>
+      const f = r.f, none = !f.totalIn && !f.totalOut, sel = dashboardMonth === r.m;
+      return `<button type="button" class="dz-month ${sel ? "is-selected" : ""}" data-month-filter="${r.m}" ${tip(`${r.label} ${dashboardYear}`, none ? "Sin datos" : detail(f))} aria-label="${escapeAttr(none ? `${r.label}: sin datos` : `${r.label}: ${detail(f)}`)}">
+        <span class="dz-month-net num ${f.net < 0 ? "is-neg" : ""}">${none ? "" : compactMoney(f.net).replace(/^(?!−)/, "+")}</span>
+        <span class="dz-month-bars"><span class="dz-stack">${stack([["inc", f.income], ["snd", f.received], ["loan", f.loanIn], ["adj", f.adjustIn]])}</span><span class="dz-stack">${stack([["exp", f.expense], ["snd", f.sent], ["loan", f.loanOut], ["adj", f.adjustOut]])}</span></span>
         <span class="dz-month-label">${r.label}</span>
       </button>`;
     }).join("")}</div></div>
@@ -396,7 +402,7 @@ function budgetRow(b, { compact = false } = {}) {
   </div>`;
 }
 function budgetsCard() {
-  const items = countryItems(state.budgets);
+  const items = countryItems(state.budgets).filter(b => Number(b.amount) > 0);
   return `<article class="dz-panel"><div class="dz-head"><div><h3>Presupuestos</h3><p>${budgetPace() ? "Gastado y proyección al cierre del mes" : "Gastado frente al límite"}</p></div><button type="button" class="dz-link" data-go="presupuestos">Ver todos</button></div>
     ${items.length ? `<div class="dz-budgets">${items.map(b => budgetRow(b, { compact: true })).join("")}</div>` : empty("Sin presupuestos", "Crea uno desde la sección Presupuestos.")}</article>`;
 }
