@@ -241,26 +241,56 @@ function dashKpis(flow, prevFlow, prevLabel, balance) {
     <article class="dz-card"><p class="dz-eyebrow">${dot("exp")}Gastaste</p><strong class="dz-value num">${money(flow.expense)}</strong><p class="dz-sub">${pctChange(flow.expense, prevFlow.expense) ? `${pctChange(flow.expense, prevFlow.expense)} vs ${prevLabel}` : "consumo del periodo"}</p></article>
     ${transferCard}</section>`;
 }
+function firstMonthWithData(year, country = state.country) {
+  const months = state.transactions.filter(x => x.country === country && x.date?.startsWith(`${year}-`)).map(x => x.date.slice(5, 7));
+  return months.length ? months.sort()[0] : null;
+}
+/* Saldo con el que empezó el periodo: el saldo trasladado del mes (o del primer mes del año). */
+function periodOpening() {
+  if (dashboardMonth !== "all") return openingBalanceForMonth(dashboardYear, dashboardMonth);
+  const first = firstMonthWithData(dashboardYear);
+  return first ? openingBalanceForMonth(dashboardYear, first) : null;
+}
 function flowCard(flow, balance) {
   const other = state.country === "CN" ? "CO" : "CN";
-  const scale = Math.max(flow.totalIn, flow.totalOut, 1);
-  const w = v => `${(v / scale * 100).toFixed(3)}%`;
-  const ins = [["inc", "Ingresos", flow.income], ["snd", `Recibido de ${meta[other].name}`, flow.received], ["loan", "Préstamos recibidos", flow.loanIn], ["adj", "Ajustes", flow.adjustIn]].filter(x => x[2] > 0);
+  const opening = periodOpening();
+  const closing = balance?.closing ?? null;
+  const tol = state.country === "CO" ? 1 : 0.01;
+  const ins = [["inc", "Ingresos", flow.income, "sin préstamos"], ["snd", `Recibido de ${meta[other].name}`, flow.received, "transferencias"], ["loan", "Préstamos recibidos", flow.loanIn, "no es ingreso"], ["adj", "Ajustes", flow.adjustIn, "correcciones"]].filter(x => x[2] > 0);
   const outs = [["exp", "Gastos", flow.expense, "consumo"], ["snd", `Envíos a ${meta[other].name}`, flow.sent, "no es gasto"], ["loan", "Préstamos", flow.loanOut, "abonos a capital"], ["adj", "Ajustes", flow.adjustOut, "correcciones"]].filter(x => x[2] > 0);
-  const seg = list => list.map(([k, l, v]) => `<span class="dz-seg is-${k}" style="width:calc(${w(v)} - 2px)" ${tip(l, money(v))}></span>`).join("");
-  let gap = "";
-  if (balance && balance.verified && balance.opening !== null && dashboardMonth !== "all") {
-    const diff = balance.closing - balance.opening - flow.net;
-    if (Math.abs(diff) >= (state.country === "CO" ? 1 : 0.01)) gap = `<p class="dz-gap"><i class="bi bi-exclamation-circle" aria-hidden="true"></i>El cierre conciliado difiere en <b class="num">${signedMoney(diff)}</b> de lo registrado: puede faltar un movimiento.</p>`;
+  if (!ins.length && !outs.length && opening === null) return `<article class="dz-panel"><div class="dz-head"><div><h3>Flujo del periodo</h3><p>Lo que entró frente a lo que salió</p></div></div>${empty("Sin movimientos", "No hay entradas ni salidas en este periodo.")}</article>`;
+  const hasBalance = opening !== null && closing !== null;
+  const top = hasBalance ? [["open", dashboardMonth === "all" ? "Saldo al iniciar el año" : "Saldo del mes anterior", opening, "ya lo tenías"], ...ins] : ins;
+  const bottom = hasBalance ? [...outs, ["saldo", "Saldo al cierre", closing, balance.verified ? "conciliado" : "estimado"]] : outs;
+  let gapNote = "";
+  if (hasBalance) {
+    // Si el cierre conciliado no cuadra con lo registrado, la diferencia se muestra para que ambas barras sumen lo mismo.
+    const diff = (opening + flow.totalIn) - (flow.totalOut + closing);
+    if (Math.abs(diff) >= tol) {
+      if (diff > 0) bottom.splice(bottom.length - 1, 0, ["gap", "Salida sin registrar", diff, "falta anotar"]);
+      else top.push(["gap", "Entrada sin registrar", -diff, "falta anotar"]);
+      gapNote = `<p class="dz-gap"><i class="bi bi-exclamation-circle" aria-hidden="true"></i>El cierre conciliado no cuadra con lo registrado: hay <b class="num">${money(Math.abs(diff))}</b> de ${diff > 0 ? "salida" : "entrada"} sin anotar.</p>`;
+    }
   }
-  if (!ins.length && !outs.length) return `<article class="dz-panel"><div class="dz-head"><div><h3>Flujo del periodo</h3><p>Lo que entró frente a lo que salió</p></div></div>${empty("Sin movimientos", "No hay entradas ni salidas en este periodo.")}</article>`;
+  const sum = list => list.reduce((a, x) => a + x[2], 0);
+  const topTotal = sum(top), bottomTotal = sum(bottom), scale = Math.max(topTotal, bottomTotal, 1);
+  const seg = list => list.map(([k, l, v]) => `<span class="dz-seg is-${k}" style="width:calc(${(v / scale * 100).toFixed(3)}% - 2px)" ${tip(l, money(v))}></span>`).join("");
+  const equation = hasBalance ? `<div class="dz-eq" aria-label="Cuenta del periodo">
+      <div><span>${dot("open")}${dashboardMonth === "all" ? "Saldo al iniciar" : "Saldo anterior"}</span><strong class="num">${money(opening)}</strong></div><b class="dz-op" aria-hidden="true">+</b>
+      <div><span>Entró</span><strong class="num">${money(flow.totalIn)}</strong></div><b class="dz-op" aria-hidden="true">−</b>
+      <div><span>Salió</span><strong class="num">${money(flow.totalOut)}</strong></div><b class="dz-op" aria-hidden="true">=</b>
+      <div class="is-result"><span>${dot("saldo")}Saldo al cierre</span><strong class="num">${money(closing)}</strong></div>
+    </div>` : `<p class="dz-sub">Sin saldo trasladado en este periodo: solo se muestra lo que entró y salió.</p>`;
+  const legend = list => list.map(([k, l, v, note]) => `<div><span>${dot(k)}${escapeHtml(l)}</span><strong class="num">${money(v)}</strong><small>${note}</small></div>`).join("");
   return `<article class="dz-panel">
-    <div class="dz-head"><div><h3>Flujo del periodo</h3><p>Todo lo que entró frente a todo lo que salió, separado por destino</p></div><div class="dz-net"><span>Resultado</span><strong class="num ${flow.net < 0 ? "is-neg" : ""}">${signedMoney(flow.net)}</strong></div></div>
+    <div class="dz-head"><div><h3>Flujo del periodo</h3><p>De dónde partiste, qué entró, qué salió y con cuánto cierras</p></div><div class="dz-net"><span>${hasBalance ? "Cambio del saldo" : "Resultado"}</span><strong class="num ${flow.net < 0 ? "is-neg" : ""}">${signedMoney(flow.net)}</strong></div></div>
+    ${equation}
     <div class="dz-flow">
-      <div class="dz-flow-line"><span class="dz-flow-label">Entró</span><div class="dz-flow-bar">${seg(ins)}</div><strong class="num">${money(flow.totalIn)}</strong></div>
-      <div class="dz-flow-line"><span class="dz-flow-label">Salió</span><div class="dz-flow-bar">${seg(outs)}</div><strong class="num">${money(flow.totalOut)}</strong></div>
+      <div class="dz-flow-line"><span class="dz-flow-label">${hasBalance ? "Tenías + entró" : "Entró"}</span><div class="dz-flow-bar">${seg(top)}</div><strong class="num">${money(topTotal)}</strong></div>
+      <div class="dz-flow-line"><span class="dz-flow-label">${hasBalance ? "Salió + te quedó" : "Salió"}</span><div class="dz-flow-bar">${seg(bottom)}</div><strong class="num">${money(bottomTotal)}</strong></div>
     </div>
-    <div class="dz-flow-legend">${outs.map(([k, l, v, note]) => `<div><span>${dot(k)}${escapeHtml(l)}</span><strong class="num">${money(v)}</strong><small>${Math.round(v / flow.totalOut * 100)}% de lo que salió · ${note}</small></div>`).join("")}</div>${gap}
+    <div class="dz-flow-legend"><div class="dz-legend-group"><em>De dónde vino</em>${legend(top)}</div><div class="dz-legend-group"><em>A dónde fue</em>${legend(bottom)}</div></div>${gapNote}
+    ${hasBalance && flow.net < 0 ? `<p class="dz-sub">Este periodo salió más de lo que entró: la diferencia (${money(-flow.net)}) se cubrió con el saldo que ya tenías.</p>` : ""}
   </article>`;
 }
 function dailyCard() {
@@ -323,7 +353,7 @@ function monthlyCard() {
   const max = Math.max(1, ...rows.map(r => Math.max(r.inc, r.exp)));
   const ticks = [max, max * 2 / 3, max / 3, 0];
   return `<article class="dz-panel">
-    <div class="dz-head"><div><h3>Ingresos y gastos por mes</h3><p>${dashboardYear} · arriba, lo que te quedó después de gastar</p></div><div class="dz-legend"><span>${dot("inc")}Ingresos</span><span>${dot("exp")}Gastos</span></div></div>
+    <div class="dz-head"><div><h3>Ingresos vs. gastos de consumo</h3><p>${dashboardYear} · sin envíos ni préstamos · arriba, lo que quedó después de gastar</p></div><div class="dz-legend"><span>${dot("inc")}Ingresos</span><span>${dot("exp")}Gastos</span></div></div>
     <div class="dz-months-wrap"><div class="dz-yaxis is-bars">${ticks.map(v => `<span>${compactMoney(v)}</span>`).join("")}</div>
     <div class="dz-months">${rows.map(r => {
       const none = !r.inc && !r.exp, net = r.inc - r.exp, sel = dashboardMonth === r.m;
