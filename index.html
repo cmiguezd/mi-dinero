@@ -29,7 +29,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
   <link rel="stylesheet" href="styles.css?v=20260807-54">
-  <link rel="stylesheet" href="theme.css?v=20261115-2">
+  <link rel="stylesheet" href="theme.css?v=20261116-1">
 </head>
 <body>
   <div class="cloud-gate" id="cloudGate" role="status" aria-live="polite">
@@ -39,6 +39,7 @@
       <h1 id="cloudGateTitle">Cargando tu información</h1>
       <p id="cloudGateStatus">Consultando la última versión guardada en Google Sheets…</p>
       <button type="button" class="button hidden" id="cloudGateConnect">Continuar con Google</button>
+      <div id="cloudGateGoogle" class="cloud-gate-google hidden"></div>
     </div>
   </div>
   <div class="app-shell">
@@ -158,10 +159,13 @@
     </div>
   </div>
   <div class="toast" id="toast"></div>
-  <script src="initial-data.js"></script>
-  <script src="cloud-config.js"></script>
-  <script src="ui.js?v=20261115-2"></script>
-  <script src="app.js?v=20261115-1"></script>
-  <script src="cloud-sync.js?v=20261115-1"></script>
+  <script src="initial-data.js?v=20261116-1"></script>
+  <script src="cloud-config.js?v=20261116-1"></script>
+  <script src="sync-core.js?v=20261116-1"></script>
+  <script src="ui.js?v=20261116-1"></script>
+  <script src="app.js?v=20261116-1"></script>
+  <script src="script-sync.js?v=20261116-1"></script>
+  <script src="cloud-sync.js?v=20261116-1"></script>
+  <script>if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));</script>
 </body>
 </html>

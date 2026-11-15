@@ -1,5 +1,6 @@
 (() => {
   const config = window.MI_DINERO_CLOUD_CONFIG || {};
+  if (config.scriptUrl) return; // con Apps Script configurado se usa script-sync.js
   // El token se guarda con su vencimiento en localStorage para sobrevivir al cierre
   // de la pestaña o de la app instalada (antes vivía en sessionStorage y se perdía).
   const TOKEN_KEY = "mi-dinero-google-token-v2";

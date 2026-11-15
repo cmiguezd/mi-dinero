@@ -1,3 +1,12 @@
+/* Sincronización (estado en la barra y vinculación de dispositivos) */
+.live-sync-status[data-tone="warn"] { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); color: var(--warn-ink); }
+.live-sync-status[data-tone="warn"] span:first-child { background: var(--warn); }
+.cloud-gate-google { display: flex; justify-content: center; min-height: 44px; margin-top: 6px; }
+.sync-devices { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.sync-device { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--panel2); border: 1px solid var(--line); }
+.sync-device span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sync-device small { color: var(--muted); font-size: 12px; }
+
 /* Mi Dinero · tema grafito con verde neón y amarillo.
    Colores de datos validados para daltonismo y contraste:
    ingresos azul, gastos amarillo, envíos rojo-naranja, préstamos gris con rayas, saldo verde neón. */
