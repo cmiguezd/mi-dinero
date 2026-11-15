@@ -1004,7 +1004,7 @@ function openForm(kind,id=null){
   const countryOpts=[{value:"CN",label:"China (CNY ¥)"},{value:"CO",label:"Colombia (COP $)"}];
   let html="";
   if(kind==="transaction")html=transactionFormHtml(item);
-  if(kind==="account")html=`<div class="field full"><label for="accountName">Nombre de la cuenta</label><input class="input" id="accountName" name="name" type="text" maxlength="80" value="${escapeAttr(item?.name||"")}" placeholder="Ej. ICBC, Nequi o Efectivo" autocomplete="off" required></div>${moneyField(`Saldo actual (${cur})`,"balance",item?.balance??"",country,{full:true,allowNegative:true,help:"Reemplaza el saldo anterior"})}`;
+  if(kind==="account")html=`<div class="field full"><label for="accountCountry">País de la cuenta</label><select class="select" id="accountCountry" name="country" data-account-country>${countryOpts.map(o=>`<option value="${o.value}" ${o.value===country?"selected":""}>${o.label}</option>`).join("")}</select></div><div class="field full"><label for="accountName">Nombre de la cuenta</label><input class="input" id="accountName" name="name" type="text" maxlength="80" value="${escapeAttr(item?.name||"")}" placeholder="Ej. ICBC, Nequi o Efectivo" autocomplete="off" required></div>${moneyField(`Saldo actual (${cur})`,"balance",item?.balance??"",country,{full:true,allowNegative:true,help:"Reemplaza el saldo anterior"})}`;
   if(kind==="budget")html=formField("Categoría","category","text",item?.category||categoryNames[0],catOpts)+moneyField(`Límite mensual (${cur})`,"amount",item?.amount??"",country);
   if(kind==="transfer"){
     const from=item?.from||state.country,to=item?.to||(from==="CN"?"CO":"CN");
@@ -1026,11 +1026,13 @@ function openForm(kind,id=null){
   if(kind==="recurring")html=formField("Descripción","description","text",item?.description||"",null,true)+formField("Tipo","type","text",item?.type||"gasto",typeOpts.slice(0,2))+moneyField(`Monto (${cur})`,"amount",item?.amount??"",country)+formField("Frecuencia","frequency","text",item?.frequency||"Mensual",[{value:"Mensual",label:"Mensual"},{value:"Semanal",label:"Semanal"},{value:"Anual",label:"Anual"}])+formField("Día de cobro","day","number",item?.day||1);
   const form=$("#recordForm");
   form.innerHTML=`<div class="form-grid">${html}</div><div class="form-actions"><button type="button" class="button ghost" data-close>Cancelar</button><button class="button" type="submit">Guardar</button></div>`;
-  form.dataset.kind=kind;form.dataset.id=id||"";$("#modal").classList.remove("hidden");bindDatePickers(form);$$("[data-close]",$("#modal")).forEach(x=>x.onclick=closeForm);
+  form.dataset.kind=kind;form.dataset.id=id||"";form.dataset.country=country;$("#modal").classList.remove("hidden");bindDatePickers(form);$$("[data-close]",$("#modal")).forEach(x=>x.onclick=closeForm);
   bindMoneyInputs(form);
   if(kind==="transaction")bindTransactionForm(form);
   if(kind==="transfer")bindTransferForm(form,id||"");
   if(kind==="loan")bindLoanForm(form);
+  const accountCountry=form.querySelector("[data-account-country]");
+  if(accountCountry)accountCountry.onchange=()=>setMoneyCountry(form.querySelector('[data-money-field="balance"]'),accountCountry.value);
 }
 function closeForm(){$("#modal").classList.add("hidden")}
 function createLoanCashTransaction({loan,amount,date,stage}){
@@ -1107,19 +1109,21 @@ $("#recordForm").onsubmit=async e=>{
   if(kind==="account"){
     data.name=String(data.name||"").trim().replace(/\s+/g," ");
     if(!data.name||!Number.isFinite(data.balance)){toast("Escribe un nombre y un saldo válido");return}
-    const duplicate=countryItems(Array.isArray(state.accounts)?state.accounts:[]).some(x=>x.id!==id&&String(x.name||"").localeCompare(data.name,"es",{sensitivity:"accent"})===0);
+    const duplicate=(Array.isArray(state.accounts)?state.accounts:[]).filter(x=>x.country===(data.country||form.dataset.country||state.country)).some(x=>x.id!==id&&String(x.name||"").localeCompare(data.name,"es",{sensitivity:"accent"})===0);
     if(duplicate){toast("Ya existe una cuenta con ese nombre");return}
   }
   if(kind==="transfer"&&data.from===data.to){toast("El origen y el destino deben ser distintos");return}
+  const movedToCountry=kind==="account"&&data.country&&data.country!==state.country?data.country:null;
   const affectBalance=data.affectBalance==="yes";delete data.affectBalance;
   const hasPrior=data.hasPrior==="yes";delete data.hasPrior;
   if(kind==="loan"&&!id&&!hasPrior)data.balance=data.amount;
   if(kind==="loan"&&(!(data.balance>=0)||data.balance>data.amount)){toast("El saldo pendiente no puede ser mayor al monto prestado");return}
-  const record={...data,id:id||uid(kind[0]),country:kind==="transfer"?undefined:state.country,updatedAt:new Date().toISOString()};
+  const formCountry=data.country||form.dataset.country||state.country;
+  const record={...data,id:id||uid(kind[0]),country:kind==="transfer"?undefined:formCountry,updatedAt:new Date().toISOString()};
   if(id)state[collection]=state[collection].map(x=>x.id===id?{...x,...record}:x);
   else{state[collection].push(record);if(kind==="loan"&&affectBalance)createLoanCashTransaction({loan:record,amount:record.amount,date:record.date,stage:"opening"});}
   setButtonBusy(submitButton,true);
-  if(await saveState(previousState)){closeForm();render();toast(kind==="loan"&&affectBalance?"Préstamo y transacción guardados en Google Sheets":kind==="account"?(id?"Cuenta actualizada en Google Sheets":"Cuenta guardada en Google Sheets"):id?"Registro actualizado en Google Sheets":"Registro guardado en Google Sheets")}
+  if(await saveState(previousState)){closeForm();if(movedToCountry){state.country=movedToCountry;localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}render();toast(movedToCountry?`Cuenta guardada en ${meta[movedToCountry].name}`:kind==="loan"&&affectBalance?"Préstamo y transacción guardados en Google Sheets":kind==="account"?(id?"Cuenta actualizada en Google Sheets":"Cuenta guardada en Google Sheets"):id?"Registro actualizado en Google Sheets":"Registro guardado en Google Sheets")}
   else setButtonBusy(submitButton,false);
 };
 function askDelete(kind,id){pendingDelete={kind,id};let label="este registro";if(kind!=="all"){const collection={transaction:"transactions",account:"accounts",budget:"budgets",transfer:"transfers",loan:"loans",recurring:"recurrings"}[kind];const x=state[collection].find(i=>i.id===id);label=x?.name||x?.description||x?.category||x?.person||"este registro"}$("#confirmText").textContent=kind==="all"?"Se eliminarán todos los datos de la aplicación en Google Sheets.":`Se eliminará “${label}” de Google Sheets. Esta acción no se puede deshacer.`;$("#confirmModal").classList.remove("hidden")}
@@ -1255,7 +1259,7 @@ window.addEventListener("resize",()=>{
 $("#refreshButton").onclick=()=>{const cloud=window.MiDineroCloud;if(!cloud?.isConnected()){toast("Conecta Google Sheets para actualizar los datos");cloud?.showLogin?.();return}cloud.pull()};
 window.miDineroGetState=()=>structuredClone(state);
 let pendingMerchantMigration=false;
-window.miDineroApplyState=(next,{silent=false}={})=>{state={...blankState(),...restoreLegacyRecurringChecks(next)};if(migrateMerchantDetail(state)>0)pendingMerchantMigration=true;localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();if(!silent)toast("Datos sincronizados desde Google Sheets")};
+window.miDineroApplyState=(next,{silent=false}={})=>{const viewingCountry=state?.country;state={...blankState(),...restoreLegacyRecurringChecks(next)};if(viewingCountry)state.country=viewingCountry;if(migrateMerchantDetail(state)>0)pendingMerchantMigration=true;localStorage.setItem(STORAGE_KEY,JSON.stringify(state));render();if(!silent)toast("Datos sincronizados desde Google Sheets")};
 window.miDineroGetPendingRecurringChecksMigration=()=>pendingLegacyRecurringChecksMigration||pendingMerchantMigration?structuredClone(state):null;
 window.miDineroCompleteRecurringChecksMigration=()=>{
   pendingLegacyRecurringChecksMigration=false;pendingMerchantMigration=false;
