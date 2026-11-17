@@ -285,6 +285,7 @@ html[data-theme="light"] .dz-line-path { filter: none; }
 @media (max-width: 620px) {
   .dz-kpis { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
   .dz-hero { grid-column: 1 / -1; }
+  .dz-kpis > .dz-card:last-child { grid-column: 1 / -1; }
   .dz-card, .dz-panel { padding: 16px; }
   .dz-flow-line { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "label amount" "bar bar"; }
   .dz-flow-bar { height: 22px; }
@@ -314,6 +315,7 @@ html[data-theme="light"] .dz-line-path { filter: none; }
 
 /* ---------- Resumen en dos columnas independientes (sin huecos) ---------- */
 .dz-cols { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 14px; align-items: start; margin-bottom: 14px; }
+.dz-cols > .dz-col > .dz-panel { width: 100%; }
 .dz-month-bars .dz-stack { display: flex; flex-direction: column-reverse; gap: 1px; width: min(12px, 32%); height: 100%; border-radius: 4px 4px 0 0; overflow: hidden; background: none; }
 .dz-stack i { display: block; width: 100%; flex: 0 0 auto; }
 .dz-stack i.is-inc { background: var(--inc); } .dz-stack i.is-exp { background: var(--exp); } .dz-stack i.is-snd { background: var(--snd); } .dz-stack i.is-adj { background: var(--adj); }
