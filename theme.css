@@ -1,6 +1,7 @@
 /* Sincronización (estado en la barra y vinculación de dispositivos) */
 .live-sync-status[data-tone="warn"] { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); color: var(--warn-ink); }
 .live-sync-status[data-tone="warn"] span:first-child { background: var(--warn); }
+.live-sync-time { color: var(--muted); font-size: 9px; font-weight: 500; }
 .cloud-gate-google { display: flex; justify-content: center; min-height: 44px; margin-top: 6px; }
 .sync-devices { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
 .sync-device { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--panel2); border: 1px solid var(--line); }
@@ -60,6 +61,14 @@ html[data-theme="light"] body[data-country] .button.ghost:hover { border-color: 
 .mobile-context-action { background: var(--accent); color: var(--on-accent); box-shadow: var(--glow), 0 10px 30px rgba(0, 0, 0, .4); }
 .mobile-bottom-nav .mobile-nav-item.active { color: var(--accent-ink); }
 .live-sync-status[data-tone="ok"] span:first-child { background: var(--accent); box-shadow: var(--glow); }
+.dz-year-balances { display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:8px; align-items:end; min-height:154px; padding:18px 4px 4px; }
+.dz-year-balance { min-width:0; min-height:126px; display:grid; grid-template-rows:25px 1fr 18px; justify-items:center; align-items:end; gap:7px; padding:0 2px; border:0; border-radius:8px; background:transparent; color:var(--text); font:inherit; cursor:pointer; }
+.dz-year-balance:hover,.dz-year-balance:focus-visible { background:var(--panel2); outline:2px solid var(--accent); outline-offset:1px; }
+.dz-year-value { max-width:100%; overflow:hidden; color:var(--muted); font-size:9px; white-space:nowrap; text-overflow:ellipsis; }
+.dz-year-track { width:min(100%,28px); height:100%; display:flex; align-items:end; overflow:hidden; border-radius:6px 6px 2px 2px; background:color-mix(in srgb,var(--accent) 8%,transparent); }
+.dz-year-track i { width:100%; min-height:4px; border-radius:6px 6px 2px 2px; background:var(--accent); }
+.dz-year-balance.is-negative .dz-year-track i { background:var(--red); }
+.dz-year-balance small { color:var(--muted); font-size:10px; text-transform:capitalize; }
 .amount.ingreso, .amount.cobro { color: var(--inc-ink); }
 .amount.gasto { color: var(--text); }
 .amount.ajuste { color: var(--muted); }
@@ -323,3 +332,5 @@ html[data-theme="light"] .dz-line-path { filter: none; }
 .dz-col .dz-merchant { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; padding: 12px; }
 .dz-col .dz-merchant .dz-track, .dz-col .dz-merchant small { grid-column: 1 / -1; }
 @media (max-width: 980px) { .dz-o6 { order: 6; } }
+@media (max-width: 900px) { .live-sync-time { display:inline; } }
+@media (max-width: 640px) { .dz-year-balances { grid-template-columns:repeat(6,minmax(0,1fr)); row-gap:12px; } .dz-year-balance { min-height:108px; } .dz-year-value { font-size:8px; } }

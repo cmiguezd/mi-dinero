@@ -28,8 +28,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="styles.css?v=20260807-54">
-  <link rel="stylesheet" href="theme.css?v=20261116-3">
+  <link rel="stylesheet" href="styles.css?v=20261118-1">
+  <link rel="stylesheet" href="theme.css?v=20261118-1">
 </head>
 <body>
   <div class="cloud-gate" id="cloudGate" role="status" aria-live="polite">
@@ -70,7 +70,7 @@
         </div>
         <div class="top-actions">
           <div class="live-sync-status" id="liveSyncStatus" data-tone="">
-            <span aria-hidden="true"></span><span class="live-sync-copy">Conectando…</span>
+            <span aria-hidden="true"></span><span class="live-sync-copy" role="status" aria-live="polite" aria-atomic="true">Conectando…</span><span class="live-sync-time" id="liveSyncTime">Sin sincronización previa</span>
           </div>
           <div id="globalPeriodSlot"></div>
           <div class="header-control country-control">
@@ -143,29 +143,29 @@
     </section>
   </div>
 
-  <div class="modal-backdrop hidden" id="modal">
+  <div class="modal-backdrop hidden" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-card">
       <div class="modal-head"><div><p class="eyebrow" id="modalEyebrow">NUEVO</p><h2 id="modalTitle">Registro</h2></div><button class="icon-button" data-close aria-label="Cerrar"><i class="bi bi-x-lg" aria-hidden="true"></i></button></div>
       <form id="recordForm"></form>
     </div>
   </div>
 
-  <div class="modal-backdrop hidden" id="confirmModal">
+  <div class="modal-backdrop hidden" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
     <div class="confirm-card">
       <div class="danger-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></div>
-      <h2>Eliminar registro</h2>
+      <h2 id="confirmTitle">Eliminar registro</h2>
       <p id="confirmText">Esta acción no se puede deshacer.</p>
       <div class="form-actions"><button class="button ghost" data-cancel>Cancelar</button><button class="button danger" id="confirmDelete">Eliminar</button></div>
     </div>
   </div>
-  <div class="toast" id="toast"></div>
-  <script src="initial-data.js?v=20261116-1"></script>
-  <script src="cloud-config.js?v=20261116-1"></script>
-  <script src="sync-core.js?v=20261116-1"></script>
-  <script src="ui.js?v=20261116-2"></script>
-  <script src="app.js?v=20261116-4"></script>
-  <script src="script-sync.js?v=20261116-1"></script>
-  <script src="cloud-sync.js?v=20261116-1"></script>
+  <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+  <script src="initial-data.js?v=20261118-1"></script>
+  <script src="cloud-config.js?v=20261118-1"></script>
+  <script src="sync-core.js?v=20261118-1"></script>
+  <script src="ui.js?v=20261118-1"></script>
+  <script src="app.js?v=20261118-1"></script>
+  <script src="script-sync.js?v=20261118-1"></script>
+  <script src="cloud-sync.js?v=20261118-1"></script>
   <script>if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));</script>
 </body>
 </html>

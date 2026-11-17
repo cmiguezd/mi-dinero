@@ -294,8 +294,25 @@ function flowCard(flow, balance) {
   </article>`;
 }
 function dailyCard() {
-  const head = `<div class="dz-head"><div><h3>Saldo día a día</h3><p>${dashboardMonth === "all" ? "Selecciona un mes para ver cómo se movió tu saldo." : "Los puntos marcan salario, envíos y préstamos"}</p></div>${dashboardMonth === "all" ? "" : `<div class="dz-legend"><span>${dot("inc")}Ingreso</span><span>${dot("snd")}Envío</span><span>${dot("loan")}Préstamo</span></div>`}</div>`;
-  if (dashboardMonth === "all") return `<article class="dz-panel">${head}<div class="dz-empty-chart">Elige un mes en el selector de periodo.</div></article>`;
+  const annual = dashboardMonth === "all";
+  const head = `<div class="dz-head"><div><h3>${annual ? "Saldo mes a mes" : "Saldo día a día"}</h3><p>${annual ? "Saldo al cierre de cada mes; selecciona un mes para ver el detalle diario." : "Los puntos marcan salario, envíos y préstamos"}</p></div>${annual ? "" : `<div class="dz-legend"><span>${dot("inc")}Ingreso</span><span>${dot("snd")}Envío</span><span>${dot("loan")}Préstamo</span></div>`}</div>`;
+  if (annual) {
+    const originalMonth = dashboardMonth;
+    const points = Array.from({ length: 12 }, (_, i) => {
+      const month = String(i + 1).padStart(2, "0");
+      dashboardMonth = month;
+      const daily = dailyBalancePoints();
+      const label = new Date(Number(dashboardYear), i, 1).toLocaleString("es", { month: "short" }).replace(/\./g, "");
+      return daily?.length ? { month, label, value: daily[daily.length - 1].value } : null;
+    }).filter(Boolean);
+    dashboardMonth = originalMonth;
+    if (!points.length) return `<article class="dz-panel">${head}<div class="dz-empty-chart"><strong>Sin saldos mensuales</strong>No hay saldos trasladados que permitan calcular cierres para ${escapeHtml(dashboardYear)}.</div></article>`;
+    const scale = Math.max(1, ...points.map(p => Math.abs(p.value)));
+    return `<article class="dz-panel">${head}<div class="dz-year-balances">${points.map(p => {
+      const height = Math.max(5, Math.abs(p.value) / scale * 100), label = `${p.label} ${dashboardYear}: ${money(p.value)}`;
+      return `<button type="button" class="dz-year-balance ${p.value < 0 ? "is-negative" : ""}" data-month-filter="${p.month}" aria-label="${escapeAttr(`${label}. Abrir el detalle de ${p.label}.`)}"><span class="dz-year-value">${chartMoney(p.value)}</span><span class="dz-year-track"><i style="height:${height}%"></i></span><small>${p.label}</small></button>`;
+    }).join("")}</div></article>`;
+  }
   const points = dailyBalancePoints();
   if (!points) return `<article class="dz-panel">${head}<div class="dz-empty-chart"><strong>Saldo inicial no disponible</strong>Este mes no tiene un saldo trasladado con el cual iniciar el cálculo diario.</div></article>`;
   const values = points.map(p => p.value);

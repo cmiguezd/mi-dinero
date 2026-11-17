@@ -274,6 +274,7 @@
       window.miDineroApplyState(remote, { silent: silent || initial });
       recurringChecksMigration = window.miDineroGetPendingRecurringChecksMigration?.() || null;
       rememberRemoteVersion(remoteVersion);
+      window.miDineroMarkSynced?.();
       setStatus(initial ? "Última versión cargada desde Google Sheets" : silent ? "Datos al día" : "Actualizado desde Google Sheets", "ok");
       if (initial) setBootState("ready");
       startAutoSync();
@@ -350,6 +351,7 @@
         body: JSON.stringify({ range: writeRange, majorDimension: "COLUMNS", values: [columnValues] })
       });
       rememberRemoteVersion(writtenAt);
+      window.miDineroMarkSynced?.();
       setStatus("Guardado en Google Sheets", "ok");
       startAutoSync();
       return true;

@@ -3,10 +3,19 @@
 const fs = require('fs'), vm = require('vm');
 const [appPath, statePath] = process.argv.slice(2);
 const migrate = process.argv.includes('--migrate');
+// El golden fue generado con noviembre detenido al día 15. Fijar el reloj hace
+// que la comparación no cambie cada día mientras ese mes siga siendo el actual.
+const RealDate = Date, testNow = new RealDate(2026, 10, 15, 12);
+const TestDate = class extends RealDate {
+  constructor(...args) { super(...(args.length ? args : [testNow])); }
+  static now() { return testNow.getTime(); }
+  static parse(value) { return RealDate.parse(value); }
+  static UTC(...args) { return RealDate.UTC(...args); }
+};
 const el = new Proxy(function () {}, { get: (t, k) => k === Symbol.toPrimitive ? () => '' : k === 'length' ? 0 : k === Symbol.iterator ? [][Symbol.iterator] : el, apply: () => el, set: () => true, construct: () => el });
 const store = {};
 const storage = { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; } };
-const ctx = { console, structuredClone, Intl, Date, Math, JSON, Number, String, Array, Object, Set, Map, RegExp, Symbol, Promise, setTimeout, clearTimeout, URL, Blob: function () {},
+const ctx = { console, structuredClone, Intl, Date: TestDate, Math, JSON, Number, String, Array, Object, Set, Map, RegExp, Symbol, Promise, setTimeout, clearTimeout, URL, Blob: function () {},
   localStorage: storage, sessionStorage: storage, requestAnimationFrame: () => 0,
   matchMedia: () => ({ matches: false }), addEventListener: () => {}, scrollTo: () => {}, confirm: () => false,
   document: { querySelector: () => el, querySelectorAll: () => [], getElementById: () => el, createElement: () => el, addEventListener: () => {}, documentElement: el, body: el, contains: () => false } };

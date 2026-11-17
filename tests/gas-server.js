@@ -59,4 +59,4 @@ http.createServer((req, res) => {
     const out = req.method === 'GET' ? ctx.doGet() : ctx.doPost({ postData: { contents: body } });
     res.writeHead(200, cors); res.end(out.text);
   }, delayMs));
-}).listen(port, () => console.log(`Apps Script simulado en http://localhost:${port}/exec`));
+}).listen(port, "127.0.0.1", () => console.log(`Apps Script simulado en http://localhost:${port}/exec`));

@@ -16,7 +16,7 @@
   const load = (k, fallback) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? fallback; } catch { return fallback; } };
   let outbox = load(OUTBOX_KEY, []);
   let version = localStorage.getItem(VERSION_KEY) || "";
-  let busy = false, pollTimer = null, gisReady = null;
+  let busy = false, pollTimer = null, gisReady = null, syncError = "";
   const token = () => localStorage.getItem(TOKEN_KEY) || "";
   const saveOutbox = () => localStorage.setItem(OUTBOX_KEY, JSON.stringify(outbox));
   const deviceId = () => { let id = localStorage.getItem(DEVICE_KEY); if (!id) { id = syncNewId(); localStorage.setItem(DEVICE_KEY, id); } return id; };
@@ -31,6 +31,8 @@
   const queueStatus = () => {
     const n = outbox.length, plural = n === 1 ? "cambio guardado" : "cambios guardados";
     if (!navigator.onLine) setStatus(n ? `Sin conexión · ${n} ${plural} en este dispositivo` : "Sin conexión · mostrando lo último guardado", "warn");
+    else if (n && !token()) setStatus("Cambios pendientes · vuelve a vincular este dispositivo para enviarlos", "warn");
+    else if (syncError) setStatus(`${syncError} · se reintentará automáticamente`, "warn");
     else if (n) setStatus(`Sincronizando ${n} ${n === 1 ? "cambio" : "cambios"}…`);
     else setStatus("Todo sincronizado", "ok");
   };
@@ -66,6 +68,7 @@
   }
   function handleError(error) {
     console.error("Mi Dinero sync:", error);
+    syncError = friendlyError(error);
     if (error?.code === "UNAUTHORIZED") { localStorage.removeItem(TOKEN_KEY); stopPolling(); setBootState("auth", friendlyError(error)); renderGoogleButton(); }
     setStatus(friendlyError(error), error?.code === "UNAUTHORIZED" ? "error" : "warn");
   }
@@ -92,8 +95,10 @@
     try {
       queueStatus();
       const r = await call("push", { ops: sending });
+      syncError = "";
       outbox = outbox.filter(o => !ids.has(o.id)); saveOutbox();
       version = r.version; localStorage.setItem(VERSION_KEY, version);
+      window.miDineroMarkSynced?.();
       applyFromServer(r.state);
       if (r.rejected?.length && typeof toast === "function") toast(`${r.rejected.length} ${r.rejected.length === 1 ? "cambio tuyo se reemplazó" : "cambios tuyos se reemplazaron"} por una edición más reciente de otro dispositivo`);
     } catch (error) { handleError(error); }
@@ -106,7 +111,9 @@
     try {
       if (!initial) setStatus("Consultando cambios…");
       const r = await call("pull");
+      syncError = "";
       version = r.version || ""; localStorage.setItem(VERSION_KEY, version);
+      window.miDineroMarkSynced?.();
       if (r.state) applyFromServer(r.state, { silent: silent || initial });
       else enqueue(syncDiff({}, window.miDineroGetState?.() || {}, Date.now(), deviceId()));
       setBootState("ready");
@@ -123,6 +130,7 @@
     if (outbox.length) return flush();
     try {
       const r = await call("version", {}, 15000);
+      syncError = "";
       if (r.version && r.version !== version) await pull({ silent: true });
       else queueStatus();
     } catch (error) { handleError(error); }

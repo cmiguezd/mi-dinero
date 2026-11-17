@@ -1,6 +1,6 @@
 /* Mi Dinero · permite abrir la app sin conexión. Siempre intenta la red primero
    (para recibir versiones nuevas) y usa la copia guardada solo si no hay internet. */
-const CACHE = "mi-dinero-v1";
+const CACHE = "mi-dinero-v2";
 self.addEventListener("install", e => {
   self.skipWaiting();
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(["./", "./index.html"])).catch(() => {}));

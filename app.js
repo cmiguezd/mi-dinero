@@ -4,6 +4,7 @@ const THEME_KEY = "mi-dinero-theme";
 const LEGACY_RECURRING_CHECKS_KEY = "mi-dinero-recurring-checks";
 const RECURRING_CHECKS_MIGRATION_KEY = "mi-dinero-recurring-checks-migrated-v1";
 const LOAN_SETTLED_FILTER_KEY = "mi-dinero-hide-settled-loans";
+const LAST_SYNC_KEY = "mi-dinero-last-successful-sync";
 const blankState = () => ({
   version: 3, country: "CN",
   transactions: [], accounts: [], budgets: [], transfers: [], loans: [], recurrings: [], recurringChecks: {},
@@ -13,6 +14,7 @@ let state = loadState();
 let currentPage = "resumen";
 let colorTheme = localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark";
 let pendingDelete = null;
+let recordModalReturnFocus = null;
 let pendingLegacyRecurringChecksMigration = false;
 let hideSettledLoans = localStorage.getItem(LOAN_SETTLED_FILTER_KEY) !== "false";
 let loanDetailContext = null;
@@ -42,12 +44,23 @@ const mobilePrimaryActions={
 
 function initialState(){return window.MI_DINERO_INITIAL_DATA?{...blankState(),...structuredClone(window.MI_DINERO_INITIAL_DATA)}:blankState()}
 function loadState(){try{const saved=localStorage.getItem(STORAGE_KEY);return saved?{...blankState(),...JSON.parse(saved)}:initialState()}catch{return initialState()}}
+function displayLastSync(){
+  const el=$("#liveSyncTime");if(!el)return;
+  const saved=localStorage.getItem(LAST_SYNC_KEY),value=Number(saved)||Date.parse(saved||"");
+  const text=value?new Intl.DateTimeFormat("es",{dateStyle:"medium",timeStyle:"short"}).format(new Date(value)):"Sin sincronización previa";
+  el.textContent=value?`Última sincronización ${new Intl.DateTimeFormat("es",{hour:"2-digit",minute:"2-digit"}).format(new Date(value))}`:text;
+  const settingsTime=$("#settingsLastSync");if(settingsTime)settingsTime.textContent=text;
+  el.title=value?new Intl.DateTimeFormat("es",{dateStyle:"medium",timeStyle:"short"}).format(new Date(value)):"Aún no se ha confirmado una sincronización";
+}
+window.miDineroMarkSynced=()=>{localStorage.setItem(LAST_SYNC_KEY,String(Date.now()));displayLastSync()};
+window.miDineroRefreshSyncTime=displayLastSync;
 async function saveState(previousState){
   const cloud=window.MiDineroCloud;
   try{
     if(!cloud?.configured())throw new Error("Configura Google Sheets antes de guardar registros.");
     await cloud.push(structuredClone(state),previousState?structuredClone(previousState):undefined);
     localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+    displayLastSync();
     return true;
   }catch(error){
     if(previousState)state=previousState;
@@ -61,7 +74,7 @@ function money(value,country=state.country){return new Intl.NumberFormat(meta[co
 function dateLabel(date){if(!date)return "";return new Intl.DateTimeFormat("es",{day:"2-digit",month:"short",year:"numeric",timeZone:"UTC"}).format(new Date(`${date}T12:00:00Z`))}
 // Fecha local del dispositivo (toISOString usa UTC: en China antes de las 8:00 daba el día anterior).
 function today(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
-function toast(text){const el=$("#toast");el.textContent=text;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),2400)}
+function toast(text){if(window.MI_DINERO_SCRIPT_MODE)text=text.replace(/(guardad[oa]s?|actualizad[oa]s?|eliminad[oa]s?) en Google Sheets/gi,"$1 localmente; sincronización en segundo plano");const el=$("#toast");el.textContent=text;el.classList.add("show");setTimeout(()=>el.classList.remove("show"),2400)}
 function setButtonBusy(button,busy,label="Guardando…"){
   if(!button)return;
   if(busy){button.dataset.originalText=button.textContent;button.textContent=label;button.disabled=true;button.setAttribute("aria-busy","true")}
@@ -340,6 +353,7 @@ function render(){
   const views={resumen:renderDashboard,cuentas:renderAccounts,transacciones:renderTransactions,presupuestos:renderBudgets,transferencias:renderTransfers,prestamos:renderLoans,recurrentes:renderRecurrings,configuracion:renderSettings};
   $("#globalPeriodSlot").innerHTML=globalPeriodBar();
   $("#content").innerHTML=views[currentPage]();
+  displayLastSync();
   bindPage();
   updateMobileNavigation();
 }
@@ -775,7 +789,7 @@ function renderSettings(){const cloud=window.MiDineroCloud,connected=cloud?.isCo
       </div>
     </div>
   </div>
-  <div class="settings-grid"><div class="panel appearance-panel"><h3>Apariencia</h3><p class="muted">Elige cómo quieres ver la aplicación en este dispositivo.</p><div class="theme-selector" role="group" aria-label="Modo de apariencia"><button type="button" data-theme-option="light" class="${colorTheme==="light"?"active":""}" aria-pressed="${colorTheme==="light"}"><span aria-hidden="true"><i class="bi bi-sun"></i></span><strong>Modo día</strong><small>Fondo claro</small></button><button type="button" data-theme-option="dark" class="${colorTheme==="dark"?"active":""}" aria-pressed="${colorTheme==="dark"}"><span aria-hidden="true"><i class="bi bi-moon-stars"></i></span><strong>Modo noche</strong><small>Fondo oscuro</small></button></div></div><div class="panel"><h3>Cuenta</h3><div class="settings-row"><span>Nombre</span><strong>${escapeHtml(state.settings.user)}</strong></div><div class="settings-row"><span>Almacenamiento</span><strong>Google Sheets obligatorio</strong></div><div class="cloud-status" id="cloudStatus">${escapeHtml(status)}</div><div class="form-actions" style="justify-content:flex-start">${connected?`<button class="button" id="syncNow">Sincronizar ahora</button><button class="button ghost" id="disconnectGoogle">Desconectar</button>`:`<button class="button" id="connectGoogle">Conectar Google Sheets</button>`}</div></div>
+  <div class="settings-grid"><div class="panel appearance-panel"><h3>Apariencia</h3><p class="muted">Elige cómo quieres ver la aplicación en este dispositivo.</p><div class="theme-selector" role="group" aria-label="Modo de apariencia"><button type="button" data-theme-option="light" class="${colorTheme==="light"?"active":""}" aria-pressed="${colorTheme==="light"}"><span aria-hidden="true"><i class="bi bi-sun"></i></span><strong>Modo día</strong><small>Fondo claro</small></button><button type="button" data-theme-option="dark" class="${colorTheme==="dark"?"active":""}" aria-pressed="${colorTheme==="dark"}"><span aria-hidden="true"><i class="bi bi-moon-stars"></i></span><strong>Modo noche</strong><small>Fondo oscuro</small></button></div></div><div class="panel"><h3>Cuenta</h3><div class="settings-row"><span>Nombre</span><strong>${escapeHtml(state.settings.user)}</strong></div><div class="settings-row"><span>Almacenamiento</span><strong>Google Sheets obligatorio</strong></div><div class="settings-row"><span>Última sincronización confirmada</span><strong id="settingsLastSync">Sin sincronización previa</strong></div><div class="cloud-status" id="cloudStatus">${escapeHtml(status)}</div><div class="form-actions" style="justify-content:flex-start">${connected?`<button class="button" id="syncNow">Sincronizar ahora</button><button class="button ghost" id="disconnectGoogle">Desconectar</button>`:`<button class="button" id="connectGoogle">Conectar Google Sheets</button>`}</div></div>
   <div class="panel private-config-panel"><div class="private-config-head"><div><span class="private-config-kicker">Acceso y sincronización</span><h3>Configuración privada</h3></div><span class="private-config-badge" aria-label="Valores ocultos por defecto">Protegida</span></div><p class="muted private-config-intro">Los identificadores se ocultan para evitar que otras personas los vean en tu pantalla. Los permisos de Google Sheets continúan siendo la protección real de tus datos.</p><div class="private-config-fields"><div class="field"><label for="googleClientId">Google OAuth Client ID</label><div class="secret-input-wrap"><input class="input secret-input" type="password" id="googleClientId" value="${escapeAttr(window.MI_DINERO_CLOUD_CONFIG?.clientId||"")}" placeholder="...apps.googleusercontent.com" autocomplete="off" spellcheck="false"><button type="button" class="secret-toggle" data-secret-toggle="googleClientId" aria-label="Mostrar Google OAuth Client ID" aria-pressed="false"><span class="secret-toggle-icon" aria-hidden="true"><i class="bi bi-eye"></i></span><span class="secret-toggle-label">Mostrar</span></button></div><small class="field-help">Identifica la aplicación ante Google; no es una contraseña.</small></div><div class="field"><label for="googleSheetId">ID del Google Sheet</label><div class="secret-input-wrap"><input class="input secret-input" type="password" id="googleSheetId" value="${escapeAttr(window.MI_DINERO_CLOUD_CONFIG?.spreadsheetId||"")}" placeholder="Identificador del archivo maestro" autocomplete="off" spellcheck="false"><button type="button" class="secret-toggle" data-secret-toggle="googleSheetId" aria-label="Mostrar ID del Google Sheet" aria-pressed="false"><span class="secret-toggle-icon" aria-hidden="true"><i class="bi bi-eye"></i></span><span class="secret-toggle-label">Mostrar</span></button></div><small class="field-help">Solo las cuentas autorizadas en Google pueden acceder al archivo.</small></div></div><div class="private-config-footer"><span class="private-config-note"><span aria-hidden="true">●</span> Se guardan en este navegador al pulsar el botón.</span><button class="button" id="saveCloudConfig">Guardar configuración</button></div></div>
   ${syncModePanel()}
   ${merchantMigrationPanel()}
@@ -783,8 +797,8 @@ function renderSettings(){const cloud=window.MiDineroCloud,connected=cloud?.isCo
 
 function syncModePanel(){
   const cloud=window.MiDineroCloud,script=cloud?.mode==="script";
-  if(script)return `<div class="panel sync-panel"><h3>Conexión sin login</h3><p class="muted">Este dispositivo está vinculado al servidor de Apps Script: abre directo, guarda aunque no haya internet y sincroniza solo.</p><div class="settings-row"><span>Cambios pendientes de enviar</span><strong>${cloud.pendingCount()}</strong></div><div class="sync-devices" id="syncDevices"><small class="muted">Cargando dispositivos vinculados…</small></div><div class="form-actions" style="justify-content:flex-start"><button type="button" class="button ghost" id="leaveScriptMode">Volver al modo anterior</button></div></div>`;
-  return `<div class="panel sync-panel"><h3>Conexión sin login</h3><p class="muted">Pega la URL de tu Apps Script para no volver a iniciar sesión cada hora y poder registrar sin conexión. Guía: <a href="https://github.com/cmiguezd/mi-dinero/blob/main/apps-script/README.md" target="_blank" rel="noopener">cómo instalarlo</a>.</p><div class="field"><label for="scriptUrlInput">URL de la aplicación web</label><input class="input" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" spellcheck="false"></div><div class="form-actions" style="justify-content:flex-start"><button type="button" class="button" id="enableScriptMode">Activar</button></div></div>`;
+  if(script){const globalScript=Boolean(window.MI_DINERO_GLOBAL_SCRIPT_URL);return `<div class="panel sync-panel"><h3>Modo rápido y sincronización</h3><p class="muted">Los movimientos se guardan al instante en este dispositivo y se envían en segundo plano. El vínculo de Google se conserva por dispositivo; la URL del servidor se configura una sola vez para toda la app.</p><div class="settings-row"><span>Cambios pendientes de enviar</span><strong>${cloud.pendingCount()}</strong></div><div class="sync-devices" id="syncDevices"><small class="muted">Cargando dispositivos vinculados…</small></div>${globalScript?`<p class="field-help">Este modo está activado para todos los dispositivos.</p>`:`<div class="form-actions" style="justify-content:flex-start"><button type="button" class="button ghost" id="leaveScriptMode">Volver al modo anterior</button></div>`}</div>`}
+  return `<div class="panel sync-panel"><h3>Modo rápido y sincronización</h3><p class="muted">El modo rápido guarda cada movimiento en este dispositivo y lo sincroniza en segundo plano. Para que se active automáticamente en todos tus dispositivos, la URL del servidor se configura una sola vez en la app. Si aún no está configurada, puedes vincular este dispositivo aquí. Guía: <a href="https://github.com/cmiguezd/mi-dinero/blob/main/apps-script/README.md" target="_blank" rel="noopener">cómo instalarlo</a>.</p><div class="field"><label for="scriptUrlInput">URL de la aplicación web</label><input class="input" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" spellcheck="false"></div><div class="form-actions" style="justify-content:flex-start"><button type="button" class="button" id="enableScriptMode">Activar en este dispositivo</button></div></div>`;
 }
 async function renderSyncDevices(){
   const box=$("#syncDevices"),cloud=window.MiDineroCloud;if(!box||cloud?.mode!=="script")return;
@@ -1025,7 +1039,19 @@ function openForm(kind,id=null){
   if(kind==="recurring")html=formField("Descripción","description","text",item?.description||"",null,true)+formField("Tipo","type","text",item?.type||"gasto",typeOpts.slice(0,2))+moneyField(`Monto (${cur})`,"amount",item?.amount??"",country)+formField("Frecuencia","frequency","text",item?.frequency||"Mensual",[{value:"Mensual",label:"Mensual"},{value:"Semanal",label:"Semanal"},{value:"Anual",label:"Anual"}])+formField("Día de cobro","day","number",item?.day||1);
   const form=$("#recordForm");
   form.innerHTML=`<div class="form-grid">${html}</div><div class="form-actions"><button type="button" class="button ghost" data-close>Cancelar</button><button class="button" type="submit">Guardar</button></div>`;
-  form.dataset.kind=kind;form.dataset.id=id||"";form.dataset.country=country;$("#modal").classList.remove("hidden");bindDatePickers(form);$$("[data-close]",$("#modal")).forEach(x=>x.onclick=closeForm);
+  form.dataset.kind=kind;form.dataset.id=id||"";form.dataset.country=country;
+  const modal=$("#modal");recordModalReturnFocus=document.activeElement;modal.classList.remove("hidden");
+  requestAnimationFrame(()=>form.querySelector('input:not([type="hidden"]),select,textarea,button')?.focus());
+  modal.onkeydown=e=>{
+    if(e.key==="Escape"){e.stopPropagation();closeForm();return}
+    if(e.key!=="Tab")return;
+    const focusable=[...modal.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(x=>!x.closest(".hidden"));
+    if(!focusable.length)return;
+    const first=focusable[0],last=focusable[focusable.length-1];
+    if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
+    else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+  };
+  bindDatePickers(form);$$("[data-close]",modal).forEach(x=>x.onclick=closeForm);
   bindMoneyInputs(form);
   if(kind==="transaction")bindTransactionForm(form);
   if(kind==="transfer")bindTransferForm(form,id||"");
@@ -1033,7 +1059,7 @@ function openForm(kind,id=null){
   const accountCountry=form.querySelector("[data-account-country]");
   if(accountCountry)accountCountry.onchange=()=>setMoneyCountry(form.querySelector('[data-money-field="balance"]'),accountCountry.value);
 }
-function closeForm(){$("#modal").classList.add("hidden")}
+function closeForm(){$("#modal").classList.add("hidden");if(recordModalReturnFocus?.isConnected)recordModalReturnFocus.focus();recordModalReturnFocus=null}
 function createLoanCashTransaction({loan,amount,date,stage}){
   const isOpening=stage==="opening";
   const cashIn=isOpening?loan.direction==="owed":loan.direction==="receivable";
